@@ -74,21 +74,39 @@ python3 -m http.server 8000
 
 ## 部署到 GitHub Pages
 
+仓库已经准备好，`main` 分支、`.gitignore`、`.gitattributes`、`.nojekyll`、Pages workflow 都在，**push 上去就能玩**。
+
 ```bash
-# 1. 在 GitHub 新建一个空仓库（不要勾选 README），然后
+# 1. 在 GitHub 网页新建一个空仓库（不要勾选 Add README / .gitignore / license）
+
+# 2. 关联并推送（把地址换成你自己的）
 git remote add origin https://github.com/<你的用户名>/<仓库名>.git
-git branch -M main          # 如果当前分支是 master
 git push -u origin main
-
-# 2. 仓库页 → Settings → Pages
-#    Source: Deploy from a branch
-#    Branch: main / (root)  → Save
-
-# 3. 等 1 分钟左右，访问
-#    https://<你的用户名>.github.io/<仓库名>/
 ```
 
-纯静态、无构建步骤、无外部 CDN，推上去就能跑。
+**3. 开启 Pages**（两种任选一种）：
+
+| 方式 | 操作 | 说明 |
+|---|---|---|
+| **GitHub Actions**（推荐） | Settings → Pages → Source 选 **GitHub Actions** | 仓库自带 `.github/workflows/pages.yml`，之后每次 push 自动重新部署 |
+| Deploy from a branch | Settings → Pages → Source 选 **Deploy from a branch**，分支 `main` / `(root)` | 不依赖 Actions，push 后自动构建，但改了设置要手动重跑 |
+
+**4. 等 1 分钟左右**，访问 `https://<你的用户名>.github.io/<仓库名>/`
+
+> 首次 push 如果提示要身份，先配置一次：
+> ```bash
+> git config user.name  "你的名字"
+> git config user.email "你的GitHub邮箱"
+> ```
+> 想让历史提交也显示成你，可以重写作者：
+> ```bash
+> git filter-branch -f --env-filter '
+>   export GIT_AUTHOR_NAME="你的名字";   export GIT_AUTHOR_EMAIL="你的GitHub邮箱"
+>   export GIT_COMMITTER_NAME="你的名字"; export GIT_COMMITTER_EMAIL="你的GitHub邮箱"
+> ' -- --all
+> ```
+
+纯静态、无构建步骤、无外部 CDN、零素材，推上去就能跑。
 
 ---
 
@@ -113,8 +131,26 @@ node tests/audio-check.js   # 音频链路（假 AudioContext，约 1.5 秒）
 
 ---
 
+## 目录结构
+
+```
+index.html              入口（5 个 script 按序加载）
+style.css               全部样式
+js/data.js              静态数据：英雄 / 组合 / 战队 / 真实选手池 / 克制表
+js/audio.js             程序合成 BGM 与音效（Web Audio，无音频文件）
+js/sim.js               规则与模拟：战力 / BP AI / 系列赛 / 经济 / 年龄 / 双败
+js/render.js            渲染：页面 / 卡片 / BP 看板 / 战报 / 弹窗
+js/state.js             状态与交互：存档 / 动作 / 键鼠事件 / 启动
+audio/README.md         自定义巅峰对决 BGM 的放置说明
+tests/                  无头测试（node tests/run.js）
+.github/workflows/      推 main 自动部署 Pages
+```
+
+---
+
 ## 说明
 
 - 选手 ID 与战队名取自 KPL 真实名单（2016–2026 各届大名单），**评级与总评是按历史战绩的民间评估，非官方数据**。
 - 英雄定位、克制关系参考官方与社区资料，为游戏性做过简化。
 - 本项目与腾讯、KPL 官方无关，仅供学习与娱乐。
+- 代码以 **MIT** 许可开源（见 `LICENSE`）；文中出现战队名、选手 ID、英雄名的权利归各自所有者。
