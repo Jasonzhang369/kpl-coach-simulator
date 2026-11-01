@@ -8,6 +8,10 @@
 </head>
 <body>
 <div id="game-root"></div>
-<script src="game.js"></script>
+<!-- 加载顺序：数据 → 规则/模拟 → 渲染 → 状态/启动 -->
+<script src="js/data.js"></script>
+<script src="js/sim.js"></script>
+<script src="js/render.js"></script>
+<script src="js/state.js"></script>
 </body>
 </html>
