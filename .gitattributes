@@ -1,0 +1,10 @@
+# 统一用 LF，避免 Windows 克隆后 CRLF 造成 diff 噪音
+* text=auto eol=lf
+
+# 二进制（若以后放音频/图片）
+*.mp3 binary
+*.ogg binary
+*.m4a binary
+*.wav binary
+*.png binary
+*.jpg binary
