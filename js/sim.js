@@ -111,7 +111,10 @@ function assignRosters(names) {
 
   // 全局「档位」：同一支队在所有位置都靠前 / 都靠后，联盟才会出现真正的强弱差距。
   // 旧版每个位置独立随机起点 → 大数定律把 12 队抹平成 1.2% 标准差，经营强弱毫无意义。
-  const baseOff = randInt(0, names.length - 1);
+  // 注意玩家是 names[0]，其名次 = (n - off) % n：off=1 时玩家恰好抽到垫底，
+  // 12% 战力差 + 自动 BP 会变成地狱开局，这里回避掉。
+  let baseOff = randInt(0, names.length - 1);
+  if (baseOff === 1) baseOff = 2;   // off=1 → 玩家第 12；改成 2 → 第 11，最差也不垫底
 
   POS.forEach((pos, pi) => {
     const need = names.length * 2;
