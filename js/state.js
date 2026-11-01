@@ -4,12 +4,17 @@
    ===================================================================== */
 
 /* ---------------- 交互 ---------------- */
-root.addEventListener("click", (e) => { const el = e.target.closest("[data-act]"); if (el) handleAct(el.getAttribute("data-act")); });
+root.addEventListener("click", (e) => {
+  unlockAudio();               // 首次点击才允许出声（浏览器自动播放策略）
+  const el = e.target.closest("[data-act]"); if (el) handleAct(el.getAttribute("data-act"));
+});
+// 键盘玩家也要能解锁音频
+document.addEventListener("keydown", () => { try { unlockAudio(); } catch (e) {} }, { once: true });
 
 /* ---------------- 键盘快捷键 / 帮助 ---------------- */
 const TAB_SHORTCUTS = [["team", "战队"], ["train", "训练"], ["lineup", "阵容"], ["schedule", "赛程"], ["standings", "积分榜"], ["market", "转会"], ["prestige", "声望"], ["format", "赛制"]];
 function closeTopModal() {
-  const ids = ["help-mask", "name-mask", "confirm-mask", "newgame-mask", "event-mask", "transfer-mask"];
+  const ids = ["help-mask", "settings-mask", "guide-mask", "name-mask", "confirm-mask", "newgame-mask", "event-mask", "transfer-mask"];
   for (const id of ids) {
     const el = document.getElementById(id);
     if (!el) continue;
@@ -21,6 +26,174 @@ function closeTopModal() {
   }
   return false;
 }
+/* ---------------- 设置面板（音乐 / 音效 / 返回首页） ---------------- */
+const GUIDE_KEY = "kpl_coach_guide_seen_v1";
+function guideSeen() { try { return localStorage.getItem(GUIDE_KEY) === "1"; } catch (e) { return true; } }
+function markGuideSeen() { try { localStorage.setItem(GUIDE_KEY, "1"); } catch (e) {} }
+
+function openSettings() {
+  const old = document.getElementById("settings-mask"); if (old) old.remove();
+  const mask = document.createElement("div");
+  mask.className = "modal-mask"; mask.id = "settings-mask";
+  mask.setAttribute("role", "dialog"); mask.setAttribute("aria-modal", "true"); mask.setAttribute("aria-label", "设置");
+  const p = audioPref();
+  const pct = v => Math.round(v * 100);
+  mask.innerHTML = `<div class="modal settings-modal">
+    <h3>⚙️ 设置</h3>
+    <div class="muted mb" style="font-size:12.5px">音乐与音效是<b>程序实时合成</b>的，不下载任何音频文件；设置对所有存档生效。</div>
+
+    <div class="set-row">
+      <div class="set-label">背景音乐</div>
+      <button class="switch ${p.bgmOn ? "on" : ""}" data-set="bgmOn" role="switch" aria-checked="${p.bgmOn}" aria-label="背景音乐开关">${p.bgmOn ? "开" : "关"}</button>
+    </div>
+    <div class="set-row">
+      <div class="set-label">音乐音量</div>
+      <input type="range" class="set-range" min="0" max="100" value="${pct(p.bgm)}" data-vol="bgm" aria-label="音乐音量" ${p.bgmOn ? "" : "disabled"}>
+      <b class="set-val" data-val="bgm">${pct(p.bgm)}</b>
+    </div>
+
+    <div class="set-row">
+      <div class="set-label">音效</div>
+      <button class="switch ${p.sfxOn ? "on" : ""}" data-set="sfxOn" role="switch" aria-checked="${p.sfxOn}" aria-label="音效开关">${p.sfxOn ? "开" : "关"}</button>
+    </div>
+    <div class="set-row">
+      <div class="set-label">音效音量</div>
+      <input type="range" class="set-range" min="0" max="100" value="${pct(p.sfx)}" data-vol="sfx" aria-label="音效音量" ${p.sfxOn ? "" : "disabled"}>
+      <b class="set-val" data-val="sfx">${pct(p.sfx)}</b>
+    </div>
+
+    <div class="set-row">
+      <div class="set-label">总音量</div>
+      <input type="range" class="set-range" min="0" max="100" value="${pct(p.master)}" data-vol="master" aria-label="总音量">
+      <b class="set-val" data-val="master">${pct(p.master)}</b>
+    </div>
+
+    <div class="warn" style="margin-top:12px;border-color:rgba(52,211,224,.35);background:rgba(52,211,224,.07)">
+      <b>巅峰对决 BGM</b>：内置了一首专属合成曲（更快、切分、警报音）。若想用你自己的音乐，
+      把音频命名为 <code>audio/peak.mp3</code>（也支持 .ogg/.m4a/.wav）放到游戏目录，进入巅峰对决时会自动替换。
+    </div>
+
+    <div class="opts" style="margin-top:14px">
+      <button class="btn ghost" data-act="openguide">📖 重看游玩指南</button>
+      <button class="btn ghost" data-act="gotitle">🏠 返回首页</button>
+      <button class="btn gold" data-act="closesettings">完成</button>
+    </div>
+  </div>`;
+  document.body.appendChild(mask);
+
+  const sync = () => {
+    const q = audioPref();
+    mask.querySelectorAll("[data-vol]").forEach(inp => {
+      const k = inp.getAttribute("data-vol");
+      const b = mask.querySelector(`[data-val="${k}"]`);
+      if (b) b.textContent = Math.round(q[k] * 100);
+      inp.value = Math.round(q[k] * 100);
+    });
+    mask.querySelectorAll("[data-set]").forEach(btn => {
+      const k = btn.getAttribute("data-set");
+      btn.classList.toggle("on", !!q[k]);
+      btn.setAttribute("aria-checked", String(!!q[k]));
+      btn.textContent = q[k] ? "开" : "关";
+    });
+    const bgmRange = mask.querySelector('[data-vol="bgm"]');
+    const sfxRange = mask.querySelector('[data-vol="sfx"]');
+    if (bgmRange) bgmRange.disabled = !q.bgmOn;
+    if (sfxRange) sfxRange.disabled = !q.sfxOn;
+    applyVolume();
+    updateBgm();
+  };
+  mask.addEventListener("input", e => {
+    const inp = e.target.closest("[data-vol]"); if (!inp) return;
+    const k = inp.getAttribute("data-vol");
+    audioPref()[k] = Math.max(0, Math.min(100, Number(inp.value))) / 100;
+    saveAudioPref(); sync();
+  });
+  mask.addEventListener("click", e => {
+    if (e.target === mask) { mask.remove(); return; }
+    const sw = e.target.closest("[data-set]");
+    if (sw) {
+      const k = sw.getAttribute("data-set");
+      audioPref()[k] = !audioPref()[k];
+      saveAudioPref();
+      if (k === "bgmOn" && !audioPref().bgmOn) stopBgm();
+      sync(); sfx("tick");
+      return;
+    }
+    const b = e.target.closest("[data-act]");
+    if (!b) return;
+    const a = b.getAttribute("data-act");
+    if (a === "closesettings") { mask.remove(); sfx("back"); }
+    else if (a === "openguide") { mask.remove(); openGuide(true); }
+    else if (a === "gotitle") { mask.remove(); goTitle(); }
+  });
+  return mask;
+}
+
+/* ---------------- 游玩指南 ---------------- */
+function openGuide(force) {
+  const old = document.getElementById("guide-mask"); if (old) old.remove();
+  const mask = document.createElement("div");
+  mask.className = "modal-mask"; mask.id = "guide-mask";
+  mask.setAttribute("role", "dialog"); mask.setAttribute("aria-modal", "true"); mask.setAttribute("aria-label", "游玩指南");
+  const steps = [
+    ["1", "开档", "标题页选<b>难度</b>（只决定对手的 BP 水平）和<b>名单模式</b>（平衡选秀 / 真实大名单），挑一支战队开始执教。"],
+    ["2", "转会", "赛季初转会窗口开放 <b>3 次</b>。买人进替补席，要去【阵容】提为首发才有用。卖出只能卖替补。"],
+    ["3", "训练", "每轮补充训练点。特训单个属性（+2~3，23 岁以下再 +1）；练满后花 <b>3 点 + 约 200 万</b>突破上限。别忘了留点数<b>休息</b>回体能。"],
+    ["4", "BP", "按官方规则：4 ban + 10 选，红蓝方、后手 Counter、<b>全局 BP</b>（本队用过的英雄后续局不能再选）。第 7 局是<b>巅峰对决</b>——盲选、无 ban、不受全局 BP 限制。"],
+    ["5", "比赛", "常规赛 BO5、季后赛 BO7。赛前先看战力对比，局内事件会真正改变结果；点「跳过战斗」只是快进，不会改变概率。"],
+    ["6", "季后赛", "常规赛<b>前 4</b> 进双败淘汰赛。输了进败者组还有一次机会，总决赛一场定胜负。"],
+    ["7", "长期", "每 3 个赛季 = 1 岁。27 岁起逐季衰退（主要掉操作与体能上限），记得提前培养接班人；合同到期会自动续约或离队。"],
+    ["8", "目标", "每赛季董事会有 KPI（进四强 / 夺冠 / 培养新人），达成给预算和声望，未达成扣。声望归零直接赛季失败。"]
+  ];
+  const tips = [
+    ["一键 BP", "水平介于「新秀」和「职业」之间，<b>新秀难度可以放心用</b>；职业以上建议自己 ban/选，传奇难度直接禁用。"],
+    ["体能", "全季会缓慢下滑，需要主动轮换或休息；<b>只有大场打完才能休息</b>，系列赛局间只能用替补换人。"],
+    ["熟练度", "每个选手对每个英雄有 0~100 熟练度，直接乘进战力。BP 时英雄上的 ★数字就是熟练度，训练页可以专门练。"],
+    ["快捷键", "<b>1~8</b> 切页签 · <b>/</b> 搜索英雄 · <b>B</b> 一键 BP · <b>S</b> 跳过战斗 · <b>R</b> 一键轮换 · <b>?</b> 帮助 · <b>Esc</b> 关弹窗。"]
+  ];
+  mask.innerHTML = `<div class="modal guide-modal">
+    <h3>📖 游玩指南</h3>
+    <div class="muted mb" style="font-size:12.5px">你是 KPL 战队的主教练：选人、训练、转会、BP，带队从常规赛杀进双败淘汰赛。</div>
+    <div class="guide-steps">
+      ${steps.map(([n, t, d]) => `<div class="guide-step"><span class="gs-n">${n}</span><div><b>${t}</b><div class="muted">${d}</div></div></div>`).join("")}
+    </div>
+    <div class="section-title mt">几个要点</div>
+    ${tips.map(([k, d]) => `<div class="report-line"><span class="tag key">${k}</span><span class="body">${d}</span></div>`).join("")}
+    <div class="opts" style="margin-top:14px">
+      <button class="btn gold" data-act="closeguide">开始执教</button>
+    </div>
+  </div>`;
+  document.body.appendChild(mask);
+  mask.addEventListener("click", e => {
+    if (e.target === mask) { mask.remove(); markGuideSeen(); return; }
+    const b = e.target.closest("[data-act]");
+    if (b && b.getAttribute("data-act") === "closeguide") { mask.remove(); markGuideSeen(); }
+  });
+  if (force) markGuideSeen();
+  return mask;
+}
+
+/* ---------------- 返回首页 ---------------- */
+function goTitle() {
+  if (!S) { renderTitle(); return; }
+  const inSeries = !!S.series;
+  confirmDialog({
+    title: "返回首页？",
+    body: inSeries
+      ? "当前有<b>未打完的系列赛</b>，返回首页会中断这场对局（比分不保存）。<br>其他进度（资金、训练、转会、战绩）都已自动存档。"
+      : "进度已自动存档，随时可以从标题页「继续」回来。",
+    okText: "返回首页"
+  }).then(ok => {
+    if (!ok) return;
+    stopAutoBp();
+    S.series = null;
+    S.page = "title";
+    save();
+    render();
+    sfx("back");
+  });
+}
+
 function showHelp() {
   const old = document.getElementById("help-mask"); if (old) old.remove();
   const mask = document.createElement("div");
@@ -197,6 +370,11 @@ function handleAct(act) {
     }).then(ok => { if (ok) deleteSlot(n); });
   }
   if (cmd === "showhelp") return showHelp();
+  if (cmd === "opensettings") return openSettings();
+  if (cmd === "openguide") return openGuide();
+  if (cmd === "gotitle") return goTitle();
+  if (cmd === "closeguide") { const m = document.getElementById("guide-mask"); if (m) m.remove(); markGuideSeen(); return; }
+  if (cmd === "closesettings") { const m = document.getElementById("settings-mask"); if (m) m.remove(); return; }
   if (cmd === "undo") return undoLast();
   if (cmd === "undoclear") return clearUndo();
   if (cmd === "rotate") return applyRotation(false);
@@ -327,7 +505,9 @@ function confirmNewGame() {
   const occupied = slotMeta(ng.slot || 1);
   const go = () => {
     const mask = document.getElementById("newgame-mask"); if (mask) mask.remove();
+    const first = !guideSeen();
     newGame({ difficulty: ng.difficulty, teamName: ng.teamName, rosterMode: ng.rosterMode, slot: ng.slot || 1 });
+    if (first) openGuide();   // 第一次开档自动看一次，之后不再打扰
   };
   if (!occupied) return go();
   confirmDialog({
@@ -557,6 +737,7 @@ function newGameDraft() {
 function seriesContinue() {
   stopAutoBp();
   const s = S.series, t = getMyTeam(), win = s.myScore > s.opScore;
+  try { sfx(win ? "win" : "lose"); } catch (e) {}
   // 对手（AI 战队）跟玩家打完同样消耗体能：否则它们每轮只 +8 恢复、从不支出，
   // 11 轮后满体力 99，而玩家一路掉到 35 下限 —— 相当于玩家凭空少 10% 战力。
   const oppTeam = S.teams.find(x => x.id === s.oppId);

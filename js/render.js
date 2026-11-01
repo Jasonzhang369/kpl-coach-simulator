@@ -38,6 +38,7 @@ function render() {
   else if (S.page === "event") { renderEvent(); }
   else { renderMain(); }
   renderUndoBar();
+  try { updateBgm(); } catch (e) {}   // 按当前局面切曲（内部去重，不会每帧重启）
   restoreView(sc);
 }
 /* ---------------- 撤销（单步快照） ---------------- */
@@ -210,7 +211,10 @@ function renderTopbar() {
     <div class="spacer"></div>
     <div class="nav" role="navigation" aria-label="主菜单">${nav}</div>
     <button class="btn ghost sm" data-act="renamecurrent" aria-label="重命名当前存档（存档 ${S.slot || 1}）" title="重命名当前存档（${escapeHtml(S.saveName || t.name)}）">💾</button>
+    <button class="btn ghost sm" data-act="openguide" aria-label="游玩指南" title="游玩指南">📖</button>
+    <button class="btn ghost sm" data-act="opensettings" aria-label="设置（音乐与音效）" title="设置">⚙</button>
     <button class="btn ghost sm" data-act="showhelp" aria-label="快捷键与帮助（问号键）" title="快捷键 / 帮助（?）">?</button>
+    <button class="btn ghost sm" data-act="gotitle" aria-label="返回首页（会自动存档）" title="返回首页">🏠</button>
   </div>`;
 }
 function ratingColor(r) { return { S: "#ff3b30", A: "#f5c518", B: "#34d3e0", C: "#9aa6c4" }[r] || "#9aa6c4"; }
@@ -727,6 +731,8 @@ function renderFormat() {
   <div class="report-line"><span class="tag key">年龄合同</span><span class="body"><b>3 个赛季 = 1 岁</b>：第 4、7、10… 赛季开始时全联盟年龄 +1（顶栏显示「第 N 年」）。<b>26 岁以上开始衰退</b>，而且是<b>逐季</b>掉：<b>27~29 岁</b>每赛季操作/意识/配合/心态 <b>−1</b>、成长上限 −1；<b>30 岁起</b>每赛季 <b>−2</b>、上限 −2（练不回来）。≤26 岁仍有成长机会（21 岁以下最高，27 岁起不再成长）。<b>合同按赛季计（2~6 赛季）</b>，赛季末 −1；到期自动续约（身价 50%，主力或 A 级以上且资金足够），否则<b>离队进自由身池</b>；也可在【战队】页手动续约（3~6 赛季）。</span></div>
   <div class="report-line"><span class="tag key">赛中租借</span><span class="body">转会窗口关闭后，仍可从其他战队<b>租借替补</b>：租费 = 身价 <b>25%</b>，期限 <b>3 轮</b>，到期<b>自动返回原队</b>。每赛季限 <b>${S.maxLoans || 1}</b> 次，入口在【转会】页。</span></div>
   <div class="report-line"><span class="tag key">难度</span><span class="body"><b>难度 = 对手的 BP 水平</b>，<b>不改动任何战力/属性</b>：<b>新秀</b> 会犯小错——多数回合只按版本强度 ban（很少主动针对你的英雄池）、基本不读克制、偶尔拿舒适英雄，但仍会认分路、挑强度高的英雄；<b>职业</b> 会读克制、照顾自家选手擅长、补阵容前排与输出，ban 会瞄着你的核心；<b>传奇</b> 近乎最优，几乎总拿最强解，ban 基本必中你的第一核心。<b>名单模式</b>（平衡选秀 / 真实大名单）是另一个维度，只决定 12 队怎么分人；<b>真实大名单下对手 BP 固定按「传奇」</b>。</span></div>
+  <div class="report-line"><span class="tag key">音乐</span><span class="body">BGM 与音效都是 <b>Web Audio 实时合成</b>（仓库里没有音频文件）：主菜单一首、比赛一首、<b>巅峰对决（第 7 局）有专属曲</b>、夺冠还有一段短曲。顶栏 <b>⚙ 设置</b>可分别调背景音乐 / 音效 / 总音量的开关与大小（对所有存档生效）。想换成自己的巅峰对决 BGM：把音频命名为 <code style="background:var(--bg2);padding:1px 5px;border-radius:4px">audio/peak.mp3</code> 放进游戏目录即可，检测不到就回退内置曲。</span></div>
+  <div class="report-line"><span class="tag key">界面</span><span class="body">顶栏右侧：💾 改存档名 · 📖 <b>游玩指南</b>（首次开档自动弹一次）· ⚙ 设置 · ? 快捷键 · 🏠 <b>返回首页</b>（自动存档；系列赛没打完会先确认）。</span></div>
   <div class="report-line"><span class="tag key">存档</span><span class="body"><b>3 个存档槽</b>，自动保存到当前槽位；每个槽可<b>改自定义名称</b>（标题界面「改名」，或游戏内右上角 💾），留空则显示战队名。标题界面可<b>导出 .json 备份</b>、<b>导入存档</b>（自动找空槽）、删除槽位。旧版单存档会自动迁移到存档 1。<b>危险操作</b>（覆盖开档、删除存档、卖出选手、突破上限、放弃系列赛）都会<b>二次确认</b>；特训/休息/签约等消耗型操作支持<b>↩ 撤销</b>（底部撤销条，仅主界面可撤销）。</span></div>
   <div class="report-line"><span class="tag key">开档</span><span class="body">选手全部来自<b>真实 KPL/K甲 参赛选手</b>（2016-2026 各届大名单），评级与总评按其<b>历史战绩</b>综合评估：S = 拿过总冠军/FMVP（Fly、小胖、一诺、清融、久诚、花海、钟意、长生、坦然、大帅、子阳、流浪、轩染、清清等），A = 冠军队成员/总决赛常客，B = KPL 常规首发，C = 轮换替补/新秀。<b>平衡选秀</b>下开局不做任何属性加成或削弱，12 队靠<b>蛇形分配</b>拉平（每队一强一弱）；<b>真实名单</b>则按大名单原样绑定。后续各队靠训练、转会、比赛自行发展。</span></div>
   <div class="report-line"><span class="tag key">操作</span><span class="body">键盘：<b>1~8</b> 切换页签 · <b>/</b> 搜索英雄 · <b>方向键 + Enter</b> 选/ban 英雄 · <b>B</b> 一键BP · <b>S</b> 跳过战斗 · <b>R</b> 一键轮换 · <b>Esc</b> 关闭弹窗 · <b>?</b> 帮助。所有按钮带 <b>aria-label</b>，属性条与选手卡有完整读屏描述；页面重渲染会<b>保留滚动位置与输入焦点</b>。</span></div>

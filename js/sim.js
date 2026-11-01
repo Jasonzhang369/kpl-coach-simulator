@@ -778,6 +778,7 @@ function draftBan(hn) {
   if (!st || st.actor !== d.mySide || st.type !== "ban") return;
   if (d.used.includes(hn) || oppUsed().includes(hn)) return; // 本队用过的仍可ban；对方战队用过的已从ban池移除
   d.bans[d.mySide].push(hn); d.used.push(hn); d.stepIndex++;
+  sfx("ban");
   afterDraftAction();
 }
 function draftPick(pos, hn) {
@@ -789,6 +790,7 @@ function draftPick(pos, hn) {
     if (!heroByName(hn)) return;
     if (d.picks[d.mySide].some(e => e.hero === hn)) return;
     d.picks[d.mySide].push({ pos, hero: hn });
+    sfx("pick");
     if (d.picks[d.mySide].length >= 5) finishPeakDraft();
     save(); render();
     return;
@@ -799,6 +801,7 @@ function draftPick(pos, hn) {
   const h = heroByName(hn);
   if (!h || d.used.includes(hn) || myUsed().includes(hn)) return; // 只锁「本战队」用过的英雄；对方用过的仍可选用（英雄不分区）
   d.picks[d.mySide].push({ pos, hero: hn }); d.used.push(hn); d.stepIndex++;
+  sfx("pick");
   afterDraftAction();
 }
 
@@ -1011,6 +1014,7 @@ function makeSurprise(b) {
   const hero = who === "me" ? b.myPicks[pos] : b.oppPicks[pos];
   const text = s.txt({ who, hero, skill: heroSkill(hero) });
   const swing = (who === "me" ? 1 : -1) * Math.abs(s.swing);
+  try { sfx("surprise"); } catch (e) {}
   return { text, swing };
 }
 /* 战况播报：只描述"当下"，不预告结果。

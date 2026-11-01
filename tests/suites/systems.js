@@ -216,4 +216,74 @@ module.exports = function (env, H) {
     const now = aiT.players.top.find(x => x.id === aiT.lineup.top);
     ok("AI 轮间处理好伤停首发", !(now && now.status === "inj" && now.statusRounds > 0), now && `${now.name}/${now.status}`);
   });
+
+  /* ---- 音频与界面（设置 / 指南 / 返回首页） ---- */
+  suite("音频与界面", () => {
+    // 1) 无头环境（没有 AudioContext）下所有音频接口必须安全降级，不能抛错
+    ok("无音频环境时 audioSupported() = false", T.audioSupported() === false);
+    let threw = null;
+    try {
+      T.sfx("click"); T.playBgm("menu"); T.playBgm("peak"); T.updateBgm();
+      T.stopBgm(); T.unlockAudio();
+    } catch (e) { threw = e.message; }
+    ok("音频接口在无 AudioContext 时不抛错", threw === null, threw);
+
+    // 2) 偏好持久化
+    const p = T.audioPref();
+    ok("默认有 master/bgm/sfx", typeof p.master === "number" && typeof p.bgm === "number" && typeof p.sfx === "number");
+    p.bgm = 0.31; T.saveAudioPref();
+    const raw = env.store[T.AUDIO_PREF_KEY];
+    ok("偏好写入 localStorage", !!raw && JSON.parse(raw).bgm === 0.31, raw);
+    p.bgm = T.AUDIO_DEFAULTS.bgm; T.saveAudioPref();   // 还原，避免影响后续
+
+    // 3) 四首曲子齐全，巅峰对决是独立曲目
+    ["menu", "match", "peak", "win"].forEach(k => {
+      const t = T.TRACKS[k];
+      ok(`曲目 ${k} 存在且有音符`, !!t && Array.isArray(t.bass) && t.bass.some(x => x != null) && t.bass.length === 32);
+    });
+    ok("巅峰对决曲比常规赛更快", T.TRACKS.peak.bpm > T.TRACKS.match.bpm + 20, `${T.TRACKS.peak.bpm} vs ${T.TRACKS.match.bpm}`);
+
+    // 4) 设置面板
+    const mask = T.openSettings();
+    ok("设置面板生成", !!mask && mask.id === "settings-mask");
+    const h = mask ? mask.innerHTML : "";
+    ok("设置含音乐开关", h.indexOf('data-set="bgmOn"') >= 0);
+    ok("设置含音效开关", h.indexOf('data-set="sfxOn"') >= 0);
+    ok("设置含三个音量滑块", (h.match(/data-vol="/g) || []).length === 3);
+    ok("设置含返回首页入口", h.indexOf('data-act="gotitle"') >= 0);
+    ok("设置含重看指南入口", h.indexOf('data-act="openguide"') >= 0);
+    ok("设置说明巅峰对决 BGM 可替换", h.indexOf("audio/peak.mp3") >= 0);
+
+    // 5) 游玩指南
+    const g = T.openGuide(true);
+    ok("指南面板生成", !!g && g.id === "guide-mask");
+    const gh = g ? g.innerHTML : "";
+    const steps = (gh.match(/class="guide-step"/g) || []).length;
+    ok("指南有 8 个步骤", steps === 8, steps);
+    ok("指南提到全局 BP", gh.indexOf("全局 BP") >= 0);
+    ok("指南提到巅峰对决", gh.indexOf("巅峰对决") >= 0);
+    ok("看完指南写入标记", T.guideSeen() === true);
+
+    // 6) 场景选曲：巅峰对决必须是专属曲
+    const keepSeries = S() ? S().series : null;
+    if (S()) {
+      S().series = { draft: { peak: true }, sub: "draft", myScore: 3, opScore: 3, kind: "playoff" };
+      ok("巅峰对决 → peak 专属曲", T.bgmTrackFor() === "peak", T.bgmTrackFor());
+      S().series = { draft: { peak: false }, sub: "draft", myScore: 1, opScore: 1, kind: "regular" };
+      ok("普通局 → match", T.bgmTrackFor() === "match", T.bgmTrackFor());
+      S().series = { draft: null, battle: { peak: true }, sub: "battle", myScore: 3, opScore: 3, kind: "playoff" };
+      ok("巅峰对决战斗中仍放 peak", T.bgmTrackFor() === "peak", T.bgmTrackFor());
+      S().series = { draft: null, sub: "over", myScore: 4, opScore: 2, kind: "playoff", playoffSlot: "gf" };
+      ok("总决赛夺冠 → win 短曲", T.bgmTrackFor() === "win", T.bgmTrackFor());
+      S().series = keepSeries;
+      S().page = "main";
+      ok("回到主界面 → match", T.bgmTrackFor() === "match", T.bgmTrackFor());
+    }
+
+    // 7) 顶栏入口齐全（指南 / 设置 / 返回首页）
+    H.newGame(env, { difficulty: "职业" });
+    S().tab = "team"; T.renderMain();
+    const top = root();
+    ["openguide", "opensettings", "gotitle"].forEach(a => ok(`顶栏含 ${a}`, top.indexOf(`data-act="${a}"`) >= 0));
+  });
 };

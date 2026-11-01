@@ -78,6 +78,8 @@ globalThis.__T = {
   PERSONAS, personaOf, rollPersona, makeKpi, evaluateKpi, recordHistory,
   battleWinRate, skipBattle, POWER_SCALE, profScale: 0,
   AUTO_BP, BASE_MASTERY, LANE_PICK_FLOOR, wearTeamStamina,
+  audioPref, saveAudioPref, audioSupported, sfx, playBgm, stopBgm, updateBgm, unlockAudio,
+  TRACKS, AUDIO_DEFAULTS, AUDIO_PREF_KEY, guideSeen, markGuideSeen, openSettings, openGuide, goTitle, bgmTrackFor,
   autoBpStepSafe: 0
 };
 `;
