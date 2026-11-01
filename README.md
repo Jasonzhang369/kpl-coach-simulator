@@ -74,37 +74,21 @@ python3 -m http.server 8000
 
 ## 部署到 GitHub Pages
 
-仓库已经准备好，`main` 分支、`.gitignore`、`.gitattributes`、`.nojekyll`、Pages workflow 都在，**push 上去就能玩**。
+**本站已部署：** https://jasonzhang369.github.io/kpl-coach-simulator/
+
+自己重新部署的话，仓库已经准备好（`main` 分支、`.nojekyll`、`.gitattributes`、`.gitignore`），push 上去即可：
 
 ```bash
-# 1. 在 GitHub 网页新建一个空仓库（不要勾选 Add README / .gitignore / license）
-
-# 2. 关联并推送（把地址换成你自己的）
-git remote add origin https://github.com/<你的用户名>/kpl-coach-simulator.git
-git push -u origin main
+git clone https://github.com/Jasonzhang369/kpl-coach-simulator.git
+# 改完代码后
+git add -A && git commit -m "你的改动" && git push
 ```
 
-**3. 开启 Pages**（两种任选一种）：
+然后在仓库 **Settings → Pages** 里确认：
 
-| 方式 | 操作 | 说明 |
-|---|---|---|
-| **GitHub Actions**（推荐） | Settings → Pages → Source 选 **GitHub Actions** | 仓库自带 `.github/workflows/pages.yml`，之后每次 push 自动重新部署 |
-| Deploy from a branch | Settings → Pages → Source 选 **Deploy from a branch**，分支 `main` / `(root)` | 不依赖 Actions，push 后自动构建，但改了设置要手动重跑 |
-
-**4. 等 1 分钟左右**，访问 `https://<你的用户名>.github.io/kpl-coach-simulator/`
-
-> 首次 push 如果提示要身份，先配置一次：
-> ```bash
-> git config user.name  "你的名字"
-> git config user.email "你的GitHub邮箱"
-> ```
-> 想让历史提交也显示成你，可以重写作者：
-> ```bash
-> git filter-branch -f --env-filter '
->   export GIT_AUTHOR_NAME="你的名字";   export GIT_AUTHOR_EMAIL="你的GitHub邮箱"
->   export GIT_COMMITTER_NAME="你的名字"; export GIT_COMMITTER_EMAIL="你的GitHub邮箱"
-> ' -- --all
-> ```
+- **Source**：Deploy from a branch
+- **Branch**：`main` / `(root)`
+- 点 **Save**，等 1 分钟左右即可访问
 
 纯静态、无构建步骤、无外部 CDN、零素材，推上去就能跑。
 
