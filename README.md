@@ -80,7 +80,7 @@ python3 -m http.server 8000
 # 1. 在 GitHub 网页新建一个空仓库（不要勾选 Add README / .gitignore / license）
 
 # 2. 关联并推送（把地址换成你自己的）
-git remote add origin https://github.com/<你的用户名>/<仓库名>.git
+git remote add origin https://github.com/<你的用户名>/kpl-coach-simulator.git
 git push -u origin main
 ```
 
@@ -91,7 +91,7 @@ git push -u origin main
 | **GitHub Actions**（推荐） | Settings → Pages → Source 选 **GitHub Actions** | 仓库自带 `.github/workflows/pages.yml`，之后每次 push 自动重新部署 |
 | Deploy from a branch | Settings → Pages → Source 选 **Deploy from a branch**，分支 `main` / `(root)` | 不依赖 Actions，push 后自动构建，但改了设置要手动重跑 |
 
-**4. 等 1 分钟左右**，访问 `https://<你的用户名>.github.io/<仓库名>/`
+**4. 等 1 分钟左右**，访问 `https://<你的用户名>.github.io/kpl-coach-simulator/`
 
 > 首次 push 如果提示要身份，先配置一次：
 > ```bash
