@@ -1,0 +1,333 @@
+/* ===== KPL主教练：王者之路 - 电竞风样式 ===== */
+:root{
+  --bg:#0a0e1a;
+  --bg2:#121829;
+  --panel:#161d33;
+  --panel2:#1d2742;
+  --line:#2a3454;
+  --gold:#f5c518;
+  --red:#ff3b30;
+  --red2:#ff6b5e;
+  --cyan:#34d3e0;
+  --green:#3ddc84;
+  --txt:#e8ecf6;
+  --txt2:#9aa6c4;
+  --shadow:0 8px 30px rgba(0,0,0,.45);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:"PingFang SC","Microsoft YaHei",-apple-system,system-ui,sans-serif;
+  background:
+    radial-gradient(1200px 600px at 80% -10%, rgba(255,59,48,.12), transparent 60%),
+    radial-gradient(900px 500px at -10% 110%, rgba(52,211,224,.10), transparent 60%),
+    var(--bg);
+  color:var(--txt);
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+button{font-family:inherit;cursor:pointer;border:none;outline:none}
+.hidden{display:none !important}
+
+/* ---------- 通用布局 ---------- */
+#game-root{max-width:1080px;margin:0 auto;padding:14px 16px 60px;min-height:100vh}
+.topbar{
+  display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+  background:linear-gradient(90deg,var(--panel),var(--panel2));
+  border:1px solid var(--line);border-radius:14px;padding:12px 16px;margin-bottom:14px;
+  box-shadow:var(--shadow);
+}
+.topbar .team-name{font-weight:800;font-size:18px;color:var(--gold);letter-spacing:.5px}
+.topbar .stat{display:flex;flex-direction:column;align-items:flex-start;line-height:1.2;font-size:12px;color:var(--txt2)}
+.topbar .stat b{font-size:15px;color:var(--txt)}
+.topbar .spacer{flex:1}
+.nav{display:flex;gap:8px;flex-wrap:wrap}
+.nav button{
+  background:var(--panel2);color:var(--txt2);border:1px solid var(--line);
+  padding:8px 12px;border-radius:10px;font-size:13px;font-weight:600;transition:.15s;
+}
+.nav button:hover{color:var(--txt);border-color:var(--gold)}
+.nav button.active{background:linear-gradient(135deg,var(--red),#c0241b);color:#fff;border-color:transparent}
+
+/* ---------- 卡片/通用 ---------- */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:var(--shadow)}
+.row{display:flex;gap:12px;flex-wrap:wrap}
+.grid{display:grid;gap:12px}
+.section-title{font-size:15px;font-weight:800;color:var(--gold);margin:4px 0 12px;display:flex;align-items:center;gap:8px}
+.section-title::before{content:"";width:4px;height:16px;background:var(--red);border-radius:3px;display:inline-block}
+.muted{color:var(--txt2);font-size:13px}
+.pill{display:inline-flex;align-items:center;gap:6px;background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:4px 10px;font-size:12px;color:var(--txt2)}
+.pill.gold{color:var(--gold);border-color:rgba(245,197,24,.4)}
+.pill.red{color:var(--red2);border-color:rgba(255,59,48,.4)}
+.pill.cyan{color:var(--cyan);border-color:rgba(52,211,224,.4)}
+.pill.green{color:var(--green);border-color:rgba(61,220,132,.4)}
+
+/* ---------- 按钮 ---------- */
+.btn{background:linear-gradient(135deg,var(--red),#c0241b);color:#fff;padding:11px 18px;border-radius:12px;font-weight:700;font-size:14px;box-shadow:0 6px 18px rgba(255,59,48,.25);transition:.15s}
+.btn:hover{transform:translateY(-1px);filter:brightness(1.08)}
+.btn.ghost{background:var(--panel2);color:var(--txt);border:1px solid var(--line);box-shadow:none}
+.btn.ghost:hover{border-color:var(--gold);color:var(--gold)}
+.btn.gold{background:linear-gradient(135deg,var(--gold),#c79a08);color:#1a1300;box-shadow:0 6px 18px rgba(245,197,24,.25)}
+.btn:disabled{opacity:.45;cursor:not-allowed;transform:none;filter:none}
+.btn.sm{padding:7px 12px;font-size:12px;border-radius:9px}
+
+/* ---------- 选手卡 ---------- */
+.player-card{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:12px;position:relative;transition:.15s}
+.player-card:hover{border-color:var(--gold)}
+.player-card .pos{position:absolute;top:10px;right:10px;font-size:11px;font-weight:800;padding:3px 8px;border-radius:6px}
+.pos.top{background:#3a5bd9;color:#fff}
+.pos.jungle{background:#2f9e44;color:#fff}
+.pos.mid{background:#cc5de8;color:#fff}
+.pos.bot{background:#e8590c;color:#fff}
+.pos.support{background:#0c8599;color:#fff}
+.player-card h4{font-size:15px;margin-bottom:2px}
+.player-card .lv{font-size:11px;color:var(--txt2)}
+.attr{display:flex;flex-direction:column;gap:5px;margin-top:8px}
+.attr .a{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--txt2)}
+.attr .a .name{width:42px}
+.bar{flex:1;height:7px;background:#0c1222;border-radius:5px;overflow:hidden}
+.bar > i{display:block;height:100%;background:linear-gradient(90deg,var(--cyan),var(--gold));border-radius:5px}
+.status-tag{font-size:11px;font-weight:700;padding:2px 7px;border-radius:6px;margin-top:8px;display:inline-block}
+.status-ok{background:rgba(61,220,132,.15);color:var(--green)}
+.status-hot{background:rgba(255,59,48,.15);color:var(--red2)}
+.status-low{background:rgba(154,166,196,.15);color:var(--txt2)}
+.status-inj{background:rgba(204,93,232,.18);color:#e08cff}
+
+/* ---------- 比赛/BP ---------- */
+.matchup{display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:center}
+.vs{font-weight:900;font-size:22px;color:var(--gold)}
+.bp-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+.hero-pick{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px;text-align:center}
+.hero-pick .hname{font-weight:700;font-size:13px;margin-top:6px}
+.hero-pick .role{font-size:10px;color:var(--txt2)}
+.hero-opt{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.hero-opt button{background:var(--panel);border:1px solid var(--line);color:var(--txt2);border-radius:8px;padding:5px 9px;font-size:12px}
+.hero-opt button:hover{border-color:var(--gold);color:var(--gold)}
+.hero-opt button.sel{background:var(--gold);color:#1a1300;border-color:transparent;font-weight:700}
+
+/* ---------- 战报 ---------- */
+.report-line{display:flex;gap:10px;padding:10px 12px;border-radius:10px;background:var(--panel2);border:1px solid var(--line);margin-bottom:8px;align-items:flex-start}
+.report-line .tag{font-size:11px;font-weight:800;padding:3px 8px;border-radius:6px;white-space:nowrap}
+.tag.win{background:rgba(61,220,132,.15);color:var(--green)}
+.tag.lose{background:rgba(255,59,48,.15);color:var(--red2)}
+.tag.even{background:rgba(154,166,196,.15);color:var(--txt2)}
+.tag.key{background:rgba(245,197,24,.15);color:var(--gold)}
+.report-line .body{font-size:13px;line-height:1.5}
+.score-big{font-size:40px;font-weight:900;text-align:center;letter-spacing:2px}
+.score-big .w{color:var(--green)}
+.score-big .l{color:var(--red)}
+
+/* ---------- 表格 ---------- */
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:9px 10px;text-align:center;border-bottom:1px solid var(--line)}
+th{color:var(--txt2);font-weight:700;font-size:12px}
+tr.you{background:rgba(245,197,24,.08)}
+tr.you td{color:var(--gold);font-weight:700}
+
+/* ---------- 弹窗 ---------- */
+.modal-mask{position:fixed;inset:0;background:rgba(3,6,15,.78);display:flex;align-items:center;justify-content:center;z-index:50;padding:18px}
+.modal{background:var(--panel);border:1px solid var(--line);border-radius:16px;max-width:520px;width:100%;padding:22px;box-shadow:var(--shadow);animation:pop .2s ease}
+@keyframes pop{from{transform:scale(.92);opacity:0}to{transform:scale(1);opacity:1}}
+.modal h3{color:var(--gold);font-size:18px;margin-bottom:8px}
+.modal p{color:var(--txt2);font-size:14px;line-height:1.6;margin-bottom:14px}
+.modal .opts{display:flex;flex-direction:column;gap:10px}
+
+/* ---------- 标题界面 ---------- */
+.title-screen{height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:18px}
+.title-screen .logo{font-size:54px;font-weight:900;letter-spacing:2px;background:linear-gradient(135deg,var(--gold),var(--red));-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:0 0 40px rgba(255,59,48,.25)}
+.title-screen .sub{color:var(--txt2);font-size:15px;letter-spacing:4px}
+.title-screen .tip{color:var(--txt2);font-size:12px;max-width:440px;line-height:1.7}
+
+/* ---------- 工具 ---------- */
+.center{text-align:center}
+.mt{margin-top:14px}
+.mb{margin-bottom:14px}
+.flex-between{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.warn{background:rgba(255,59,48,.1);border:1px solid rgba(255,59,48,.3);color:var(--red2);border-radius:10px;padding:10px 12px;font-size:13px}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--gold);color:var(--gold);padding:10px 18px;border-radius:10px;font-size:13px;z-index:60;box-shadow:var(--shadow)}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:760px){.two-col{grid-template-columns:1fr}.bp-grid{grid-template-columns:repeat(2,1fr)}}
+
+/* ---------- BP 看板 ---------- */
+.draft-board{display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:stretch;margin-top:6px}
+.draft-side{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:12px}
+.draft-side.me{border-color:rgba(52,211,224,.4)}
+.draft-side.foe{border-color:rgba(255,59,48,.28)}
+.draft-head{font-weight:800;font-size:14px;margin-bottom:6px;color:var(--gold)}
+.draft-side.foe .draft-head{color:var(--red2)}
+.draft-bans{font-size:12px;color:var(--txt2);margin-bottom:8px;min-height:18px}
+.draft-row{display:flex;justify-content:space-between;gap:8px;padding:5px 8px;border-radius:8px;font-size:13px;background:var(--panel);border:1px solid var(--line);margin-bottom:5px}
+.draft-row.cur{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold) inset}
+.draft-row .pname{color:var(--txt2);font-size:12px}
+.draft-row .phero{font-weight:700;text-align:right}
+.draft-vs{font-weight:900;font-size:22px;color:var(--gold);align-self:center;text-align:center}
+.c-good{color:var(--green)}
+.c-bad{color:var(--red2)}
+.c-mid{color:var(--txt2)}
+.ban-pool{max-height:280px;overflow:auto;padding-right:6px}
+@media(max-width:760px){.draft-board{grid-template-columns:1fr}.draft-vs{padding:4px 0}}
+
+/* ---------- 拖拽选将台 ---------- */
+.bench{display:flex;flex-wrap:wrap;gap:6px;max-height:240px;overflow:auto;padding:10px;background:var(--panel2);border:1px solid var(--line);border-radius:10px}
+.hero-chip{background:var(--panel);border:1px solid var(--line);color:var(--txt2);border-radius:8px;padding:6px 10px;font-size:12px;cursor:grab;transition:.12s;white-space:nowrap}
+.hero-chip:hover{border-color:var(--gold);color:var(--gold)}
+.hero-chip.sel{background:var(--gold);color:#1a1300;border-color:transparent;font-weight:700}
+.hero-chip:active{cursor:grabbing}
+.draft-row.slot{cursor:pointer;border-style:dashed}
+.draft-row.slot.filled{border-style:solid}
+.draft-row.slot.hint{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold) inset}
+.draft-row.slot.dragover{border-color:var(--cyan);box-shadow:0 0 0 2px var(--cyan) inset;background:rgba(52,211,224,.08)}
+.chip{display:inline-block;background:var(--gold);color:#1a1300;border-radius:6px;padding:2px 8px;font-weight:700;font-size:12px}
+/* 全局BP「敌用」标签：对手战队用过、本队仍可选 */
+.otag{display:inline-block;font-style:normal;font-size:10px;line-height:1;padding:2px 4px;margin-left:4px;border-radius:4px;background:rgba(192,36,27,.16);color:#ff8a80;border:1px solid rgba(192,36,27,.45);vertical-align:middle}
+/* 转会窗口开放提示点 */
+.dot-open{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);margin-left:4px;vertical-align:middle;box-shadow:0 0 6px var(--green)}
+
+/* ---------- OSCM 雷达图（输出/生存/控制/机动） ---------- */
+.mini-radar{display:inline-block;vertical-align:middle;margin-left:6px;line-height:0}
+.radar{display:block}
+.oscm-panel{display:flex;gap:14px;align-items:center;margin-top:10px;padding:10px 12px;background:var(--panel2);border:1px solid var(--line);border-radius:12px}
+.oscm-left{display:flex;flex-direction:column;align-items:center;gap:4px}
+.oscm-legend{font-size:11px;display:flex;gap:8px}
+.oscm-right{flex:1;min-width:180px}
+.oscm-row{display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:3px}
+.oscm-k{width:28px;color:var(--muted)}
+.oscm-bar{flex:1;height:7px;background:#0f1526;border-radius:4px;overflow:hidden;border:1px solid var(--line)}
+.oscm-bar i{display:block;height:100%;background:linear-gradient(90deg,#1d8f99,var(--cyan))}
+.oscm-bar.foe i{background:linear-gradient(90deg,#8c2f27,var(--red2))}
+.oscm-row b{width:22px;text-align:right;font-variant-numeric:tabular-nums}
+.pend-card{display:flex;gap:10px;align-items:flex-start;padding:10px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;margin-bottom:8px}
+@media(max-width:760px){.oscm-panel{flex-direction:column;align-items:stretch}}
+
+/* ---------- 对战胜率条(PK条) ---------- */
+.pk-wrap{display:flex;height:28px;border-radius:9px;overflow:hidden;border:1px solid var(--line);background:var(--panel2);box-shadow:var(--shadow)}
+.pk-half{display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff;white-space:nowrap;overflow:hidden;transition:width .5s ease}
+.pk-half.blue{background:linear-gradient(90deg,#1f6feb,#4a9bff)}
+.pk-half.red{background:linear-gradient(90deg,#c0241b,#ff5b52)}
+.pk-labels{display:flex;justify-content:space-between;gap:8px;font-size:11px;color:var(--txt2);margin-top:5px}
+.pk-labels span:first-child{color:var(--cyan)}
+.pk-labels span:last-child{color:var(--red2)}
+.report-line.sp{border-color:rgba(245,197,24,.55);background:rgba(245,197,24,.08);box-shadow:0 0 0 1px rgba(245,197,24,.25) inset}
+.report-line.sp .tag.key{background:rgba(245,197,24,.25);color:var(--gold)}
+#bench{position:relative}
+@keyframes flash{from{opacity:.4}to{opacity:1}}
+.report-line.sp{animation:flash .4s ease}
+.bk-row{display:flex;justify-content:space-between;gap:10px;background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px}
+.bk-row .bk-label{color:var(--txt2);font-size:12px;white-space:nowrap}
+.bk-row.done{border-color:rgba(61,220,132,.35)}
+.bk-sep{color:var(--gold);font-size:12px;font-weight:800;margin:6px 2px 2px}
+
+/* ---------- 联盟对战 / 赛季总结（可折叠） ---------- */
+.fx-list{display:flex;flex-direction:column;gap:6px}
+details.fx,details.fx-round,details.season-block{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:6px 10px}
+details.fx.me,details.fx.fx-me{border-color:rgba(245,197,24,.5);background:rgba(245,197,24,.06)}
+details.fx>summary,details.fx-round>summary,details.season-block>summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px;font-size:12.5px;padding:3px 0}
+details.fx>summary::-webkit-details-marker,details.fx-round>summary::-webkit-details-marker,details.season-block>summary::-webkit-details-marker{display:none}
+details.fx>summary::before,details.fx-round>summary::before,details.season-block>summary::before{content:"▸";color:var(--muted);font-size:10px;transition:.15s}
+details[open].fx>summary::before,details[open].fx-round>summary::before,details[open].season-block>summary::before{transform:rotate(90deg)}
+.fx-team{min-width:96px;font-weight:600}
+.fx-team.right{text-align:right}
+.fx-score{color:var(--gold);font-variant-numeric:tabular-nums;min-width:52px;text-align:center}
+.fx-game{border-top:1px dashed var(--line);padding:5px 0 3px;font-size:12px}
+.fx-lu{color:var(--muted);font-size:11.5px;margin-top:2px;line-height:1.5}
+.fx-round{margin-top:8px}
+.fx-line{font-size:12px;padding:2px 0;color:var(--txt2)}
+.season-block{margin-top:8px}
+.season-body{padding-top:6px}
+details.season-block>summary{font-size:13px}
+
+/* ---------- 巅峰对决（BO7 3:3 第7局） ---------- */
+.peak-banner{border:1px solid rgba(245,197,24,.5);background:linear-gradient(90deg,rgba(245,197,24,.14),rgba(192,36,27,.10));color:var(--gold);border-radius:10px;padding:8px 12px;font-size:12.5px;line-height:1.7}
+.peak-note{border-color:rgba(245,197,24,.45)!important;background:rgba(245,197,24,.08)!important;color:var(--gold)!important;font-size:12.5px}
+.peak-mark{display:inline-block;font-size:10px;line-height:1;padding:2px 5px;margin:0 4px;border-radius:4px;background:linear-gradient(90deg,#f5c518,#ff8a00);color:#241a00;font-weight:800;vertical-align:middle}
+.peak-tag{display:inline-block;font-style:normal;font-size:10px;line-height:1;padding:2px 4px;margin-left:4px;border-radius:4px;background:rgba(245,197,24,.16);color:#ffd75e;border:1px solid rgba(245,197,24,.45);vertical-align:middle}
+/* 双败赛程里的可展开对局（比分 + 阵容） */
+.bk-wrap{display:flex;align-items:flex-start;gap:8px;padding:3px 0}
+.bk-wrap>.bk-label{flex:0 0 98px;min-width:98px;font-size:12px;color:var(--muted);padding-top:5px;line-height:1.3}
+.bk-wrap details.fx{flex:1;min-width:0}
+
+/* ============================================================
+   v9 新增：存档槽 / 撤销条 / 固定操作条 / BP 筛选 / 积分榜晋级线 / 无障碍
+   ============================================================ */
+
+/* ---------- 标题界面存档槽 ---------- */
+.slot-list{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;width:100%;max-width:820px;margin:6px 0}
+@media(max-width:760px){.slot-list{grid-template-columns:1fr}}
+.slot{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;text-align:left;box-shadow:var(--shadow)}
+.slot.empty{opacity:.75;border-style:dashed}
+.slot .slot-h{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--txt2);margin-bottom:6px}
+.slot .slot-body{font-size:13.5px;margin-bottom:4px;line-height:1.5}
+.slot .hero-opt{margin-top:8px;display:flex;flex-wrap:wrap;gap:6px}
+
+/* ---------- 撤销条（固定左下） ---------- */
+.undo-bar{
+  position:fixed;left:50%;transform:translateX(-50%);bottom:18px;z-index:70;
+  display:flex;align-items:center;gap:10px;
+  background:var(--panel2);border:1px solid var(--gold);border-radius:12px;
+  padding:8px 12px;font-size:12.5px;color:var(--txt);box-shadow:var(--shadow);
+  animation:pop .18s ease;max-width:calc(100vw - 32px);
+}
+.undo-bar b{color:var(--gold)}
+
+/* ---------- 战斗页：固定底部操作条 + 内部滚动播报 ---------- */
+.battle-feed{max-height:46vh;overflow:auto;padding-right:4px}
+.action-spacer{height:84px}
+.action-bar{
+  position:fixed;left:0;right:0;bottom:0;z-index:65;
+  background:linear-gradient(180deg,rgba(18,24,41,.92),rgba(10,14,26,.98));
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  border-top:1px solid var(--line);
+  padding:8px 16px calc(8px + env(safe-area-inset-bottom,0px));
+  display:flex;flex-direction:column;gap:6px;
+}
+.action-bar .ab-progress{height:6px;background:#0c1222;border-radius:4px;overflow:hidden;border:1px solid var(--line)}
+.action-bar .ab-progress i{display:block;height:100%;background:linear-gradient(90deg,var(--cyan),var(--gold));transition:width .4s linear}
+.action-bar .ab-btns{display:flex;align-items:center;justify-content:flex-end;gap:12px;max-width:1080px;width:100%;margin:0 auto}
+.action-bar .ab-btns .muted{margin-right:auto}
+kbd{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;background:var(--panel);border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;padding:1px 5px;color:var(--txt2)}
+
+/* ---------- BP 工具条：分路 Tab / 只看我的池 / 搜索 ---------- */
+.bp-tools{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:8px 0}
+.lane-tabs{display:flex;flex-wrap:wrap;gap:4px}
+.lane-tab{background:var(--panel);border:1px solid var(--line);color:var(--txt2);border-radius:999px;padding:5px 11px;font-size:12px;font-weight:600;transition:.12s}
+.lane-tab:hover{border-color:var(--gold);color:var(--gold)}
+.lane-tab.sel{background:linear-gradient(135deg,var(--gold),#c79a08);color:#1a1300;border-color:transparent}
+.bp-toggle{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--txt2);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:5px 10px;cursor:pointer}
+.bp-toggle input{accent-color:var(--gold);cursor:pointer}
+.bp-search{flex:1;min-width:160px;background:var(--bg2);border:1px solid var(--line);color:var(--txt);padding:8px 12px;border-radius:9px;font-size:13px}
+.bp-search:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 2px rgba(245,197,24,.18)}
+.hero-chip.kbd,.ban-btn.kbd{outline:2px solid var(--cyan);outline-offset:2px}
+
+/* ---------- ban 阶段对手情报 ---------- */
+.intel{background:rgba(255,59,48,.06);border:1px solid rgba(255,59,48,.28);border-radius:10px;padding:10px 12px}
+.intel .intel-h{font-size:12px;font-weight:800;color:var(--red2);margin-bottom:6px}
+.ban-btn.threat{border-color:rgba(255,59,48,.45);color:#ffb3ab}
+
+/* ---------- 积分榜：晋级线 + 前4高亮 ---------- */
+.standings-wrap{overflow-x:auto}
+tr.top4 td{background:rgba(61,220,132,.05)}
+tr.top4 td:first-child{box-shadow:inset 3px 0 0 var(--green)}
+tr.cutline td{
+  background:repeating-linear-gradient(90deg,rgba(61,220,132,.16) 0 10px,transparent 10px 20px);
+  color:var(--green);font-size:11.5px;font-weight:800;letter-spacing:.5px;
+  text-align:center;padding:6px 10px;border-bottom:1px dashed rgba(61,220,132,.45)
+}
+.legend{font-size:12.5px;line-height:1.85;color:var(--txt2);background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.legend b{color:var(--txt)}
+
+/* ---------- 体能标签 ---------- */
+.st-tag{display:inline-block;font-size:10px;font-weight:800;line-height:1;padding:3px 6px;border-radius:5px;margin-top:8px;margin-left:6px;vertical-align:middle}
+.st-tag.low{background:rgba(245,197,24,.16);color:var(--gold);border:1px solid rgba(245,197,24,.45)}
+.st-tag.crit{background:rgba(255,59,48,.18);color:var(--red2);border:1px solid rgba(255,59,48,.5);animation:pulse 1.6s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.55}}
+.bar.st-low > i{background:linear-gradient(90deg,#ff3b30,#ff8a00)}
+
+/* ---------- 年龄衰退标记（27 岁以上） ---------- */
+.age-down{display:inline-block;color:var(--red2);font-weight:900;font-size:11px;margin-left:2px;vertical-align:middle}
+
+/* ---------- 无障碍 ---------- */
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+:focus-visible{outline:2px solid var(--gold);outline-offset:2px;border-radius:8px}
+button:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+.modal-body b{color:var(--txt)}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
