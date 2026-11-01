@@ -498,15 +498,9 @@ function setLineup(pos, pid) {
 function startMatch() {
   const t = getMyTeam();
   // 自动处理伤停首发：有健康替补就换上，没有就带伤出战（避免卡死）
-  POS.forEach(pos => {
-    const cur = getPlayer(t, t.lineup[pos]);
-    if (cur && cur.status === "inj" && cur.statusRounds > 0) {
-      const bench = t.players[pos]
-        .filter(p => p.id !== t.lineup[pos] && !(p.status === "inj" && p.statusRounds > 0))
-        .sort((a, b) => b.ovr - a.ovr);
-      if (bench.length) { t.lineup[pos] = bench[0].id; toast(`${POS_NAME[pos]}首发伤停，已自动换上 ${bench[0].name}`); }
-      else { cur.status = "ok"; cur.statusRounds = 0; toast(`${POS_NAME[pos]}无健康替补，${cur.name} 带伤出战`); }
-    }
+  autoFixInjuredLineup(t).forEach(c => {
+    toast(c.forced ? `${POS_NAME[c.pos]}无健康替补，${c.from.name} 带伤出战`
+                   : `${POS_NAME[c.pos]}首发伤停，已自动换上 ${c.to.name}`);
   });
   if (S.phase === "regular") {
     const sc = S.schedule.find(s => !s.played); if (!sc) return;
@@ -521,6 +515,14 @@ function startSeries(oppId, bestOf, kind, slot, label) {
   const firstSide = rand() < 0.5 ? "blue" : "red";
   // 转会窗口只在赛季初开放：打第一场常规赛即关闭
   if (kind === "regular" && S.transferWindow) { S.transferWindow = false; S.market = null; }
+  // 季后赛「休整日」：季后赛是连续 BO7，没有轮间恢复可依赖；
+  // 若不给，从八强打到决赛会一路掉到体能下限（双方都是），体能管理就彻底失去意义。
+  if (kind === "playoff") {
+    const opp = S.teams.find(t => t.id === oppId);
+    [getMyTeam(), opp].forEach(tm => {
+      if (tm) POS.forEach(pos => tm.players[pos].forEach(p => { p.st = clampSt(p, p.st + PLAYOFF_REST_GAIN); }));
+    });
+  }
   S.series = { oppId, bestOf, kind, playoffSlot: slot, label, myScore: 0, opScore: 0, gameIndex: 0, usedByTeam: { [S.myTeamId]: [], [oppId]: [] }, games: [], firstSide, nextSide: firstSide, nextSideBy: null, sideLocked: false, draft: null, sub: "draft", rewards: null, battle: null };
   S.page = "series";
   newGameDraft();
@@ -554,6 +556,10 @@ function newGameDraft() {
 function seriesContinue() {
   stopAutoBp();
   const s = S.series, t = getMyTeam(), win = s.myScore > s.opScore;
+  // 对手（AI 战队）跟玩家打完同样消耗体能：否则它们每轮只 +8 恢复、从不支出，
+  // 11 轮后满体力 99，而玩家一路掉到 35 下限 —— 相当于玩家凭空少 10% 战力。
+  const oppTeam = S.teams.find(x => x.id === s.oppId);
+  if (oppTeam) wearTeamStamina(oppTeam, (s.games || []).length);
   const rw = s.rewards || { money: 0, fans: 0 };
   t.money += rw.money; t.fans = Math.max(1000, t.fans + rw.fans);
   t.wins += win ? 1 : 0; t.losses += win ? 0 : 1;
@@ -567,7 +573,7 @@ function seriesContinue() {
     p.exp = 0; p.level++;
     // 升级涨属性只在巅峰期前有效：27 岁起升级不再回补属性，否则会把年龄衰退抵消掉
     if ((p.age || 22) < AGE_DECLINE_FROM) ["op", "aw", "co", "me"].forEach(a => p[a] = clamp(p[a] + randInt(1, 2), 40, p.ceil));
-    p.st = clampSt(p, p.st + 10);
+    p.st = clampSt(p, p.st + 4);   // 升级只小幅回血：体能主要靠休息/轮换，否则一路升到满、体能系统失效
     p.ovr = Math.round((p.op + p.aw + p.co + p.me + p.st) / 5);
   });
   S.series = null; S.page = "main"; S.tab = "schedule";
@@ -641,6 +647,13 @@ function advanceRegular() {
     S.round++;
     // 轮间休整：全队（含 AI）自然恢复体能，避免连续 BO5 一路掉到见底
     S.teams.forEach(tm => POS.forEach(pos => tm.players[pos].forEach(p => { p.st = clampSt(p, p.st + ROUND_STAMINA_GAIN); })));
+    S.teams.forEach(autoFixInjuredLineup);   // AI 也会在轮间调整伤停首发（与玩家同规则）
+    // AI 也会「管理体能」：低于 60 就多轮换一次（玩家要靠休息/换人做同样的事）。
+    // 若不做，AI 会一路掉到下限，玩家只要点两次休息就白赚 6% 战力。
+    S.teams.forEach(tm => {
+      if (tm.id === S.myTeamId) return;
+      POS.forEach(pos => tm.players[pos].forEach(p => { if (p.st < 50) p.st = clampSt(p, p.st + 8); }));
+    });
     refreshTrainPoints();
     const meUp = applyStaffPassive();          // 心理咨询师：每轮回心态
     maybeEvent();

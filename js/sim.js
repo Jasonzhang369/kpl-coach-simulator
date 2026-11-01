@@ -20,8 +20,15 @@ function ceilFor(rating) { return clamp({ S: 94, A: 87, B: 79, C: 71 }[rating] +
 
 /* ---------------- 生成 ---------------- */
 // 英雄熟练度：0~100。对战斗力的影响是连续的（不再是"会/不会"二元判断）
+// 熟练度 → 战力系数。池外英雄不是"0 熟练度"，而是「会玩但不熟」的基础值：
+// 全局 BP 一个 BO5 要每人 5 个不同英雄，而初始池只有 5~6 个 —— 若池外记 0，
+// 第 2 局起全联盟熟练度统一 0.94，这套系统就只剩第 1 局有用。
+const BASE_MASTERY = 45;
 function masteryOf(p, name) { return p && p.mastery ? (p.mastery[name] || 0) : 0; }
-function profOf(p, name) { return 0.94 + (masteryOf(p, name) / 100) * 0.18; }   // 0→0.94 · 50→1.03 · 95→1.11
+function profOf(p, name) {
+  const m = masteryOf(p, name);
+  return 0.94 + (Math.max(m, BASE_MASTERY) / 100) * 0.18;   // 池外 1.02 · 可用 1.03 · 绝活 1.11
+}
 function masteryLabel(m) { return m >= 85 ? "绝活" : m >= 70 ? "熟练" : m >= 50 ? "可用" : m > 0 ? "生疏" : "不会"; }
 // 我方首发里，谁最会这个英雄（BP 选将台显示 ★88 用）
 function myBestMastery(heroName) {
@@ -113,7 +120,12 @@ function assignRosters(names) {
     const take = list.slice(0, need), rest = list.slice(need);
     // 蛇形：0..n-1 拿排名 1..n，n-1..0 拿排名 n+1..2n → 各队两人名次之和几乎相同
     const idxs = names.map((_, i) => i);
-    const order = (pi % 2 === 0) ? idxs.concat(idxs.slice().reverse()) : idxs.slice().reverse().concat(idxs);
+    // 但「首发取全队最强」意味着「拿到第 1 名的人就是该位置最强首发」。
+    // 若每个位置都从 names[0] 开始正序，names[0]（玩家）会在所有正序位置独吞第 1 名，
+    // 实测 47/60 次开档玩家战力全联盟第一。所以每个位置的起点随机错开，让「第 1 名」分散。
+    const off = randInt(0, names.length - 1);
+    const rot = idxs.slice(off).concat(idxs.slice(0, off));
+    const order = (pi % 2 === 0) ? rot.concat(rot.slice().reverse()) : rot.slice().reverse().concat(rot);
     order.forEach((teamIdx, i) => { const e = take[i]; if (e) result[names[teamIdx]][pos].push(makePlayerFrom(e)); });
     rest.forEach(e => leftover[pos].push(e));
     preLeft.forEach(e => leftover[pos].push(e));
@@ -174,6 +186,23 @@ function initLineup(team) {
     team.lineup[pos] = best.id;
   });
 }
+// 首发伤停 → 换健康替补（没有就带伤上）。玩家在 startMatch 里走同一套逻辑，
+// AI 战队也要走，否则伤员会一直挂在首发上、该位置战力为 0，
+// 而玩家会自动换人 —— 等于玩家平白多一个位置的优势。
+function autoFixInjuredLineup(team) {
+  if (!team) return [];
+  const changed = [];
+  POS.forEach(pos => {
+    const cur = getPlayer(team, team.lineup[pos]);
+    if (!cur || cur.status !== "inj" || !(cur.statusRounds > 0)) return;
+    const bench = team.players[pos]
+      .filter(p => p.id !== cur.id && !(p.status === "inj" && p.statusRounds > 0))
+      .sort((a, b) => b.ovr - a.ovr);
+    if (bench.length) { team.lineup[pos] = bench[0].id; changed.push({ pos, from: cur, to: bench[0] }); }
+    else { cur.status = "ok"; cur.statusRounds = 0; changed.push({ pos, from: cur, to: cur, forced: true }); }
+  });
+  return changed;
+}
 
 /* ---------------- 全局状态 ---------------- */
 let S = null;
@@ -223,7 +252,7 @@ function newGame(opts) {
   S.maxRegular = S.schedule.length;
   S.kpi = makeKpi();          // 董事会赛季目标
   buildMarket();          // 赛季初自动刷新转会市场（赛季内不变）
-  maybeEvent();
+  maybeEvent({ safe: true });   // 开局/新赛季首日不出伤病
   save();
   render();
 }
@@ -267,7 +296,7 @@ function addTeamPrestige(team, delta, reason) {
 function awardTeamMatch(team, win, playoff) {
   if (!team) return null;
   const mul = playoff ? 1.8 : 1;
-  const money = Math.round((win ? randInt(32, 68) : randInt(9, 23)) * mul);
+  const money = Math.round((win ? randInt(20, 40) : randInt(6, 14)) * mul);
   const fans = Math.round((win ? randInt(4000, 11000) : -randInt(800, 3500)) * (1 + team.prestige / 150));
   team.money += money;
   team.fans = Math.max(1000, team.fans + fans);
@@ -390,9 +419,12 @@ function statusLabel(p) {
   return { ok: ["status-ok", "正常"], hot: ["status-hot", "火热"], low: ["status-low", "低迷"], inj: ["status-inj", "伤病"] }[p.status] || ["status-ok", "正常"];
 }
 /* ---------------- 体能 ---------------- */
-const GAME_STAMINA_COST = 5;   // 每局消耗（原 6，连续 BO5 必见底）
-const REST_STAMINA_GAIN = 14;  // 全队休息（2 训练点）
-const ROUND_STAMINA_GAIN = 8;  // 每轮自然恢复
+// 每局 -4：一场 BO5 ≈ -16、BO7 ≈ -28。轮间 +14 略低于一场 BO5 的消耗，
+// 所以常规赛会缓慢下滑（需要偶尔轮换/休息），但不会一路趴到下限。
+const GAME_STAMINA_COST = 4;
+const REST_STAMINA_GAIN = 16;  // 全队休息（2 训练点）
+const ROUND_STAMINA_GAIN = 11; // 每轮自然恢复：略低于一场 BO5 的消耗，全季缓慢下滑，需要主动轮换/休息
+const PLAYOFF_REST_GAIN = 18;  // 季后赛每场开赛前的「休整日」，低于一场 BO7 的消耗（连续打会掉体能）
 const STAMINA_FLOOR = 35;
 
 /* ---------------- 教练组（职员） ----------------
@@ -473,7 +505,10 @@ function posPower(p, hero, oppHero, tactic, pos) {
   const fit = pos != null ? laneFit(hero, pos) : 1.0;              // 英雄与分路匹配度（不匹配掉战斗力）
   const counter = matchupMult(hero, oppHero); // 定位克制 × 英雄级克制（可跨分路）
   const tacticMul = tactic === "攻" ? 1.05 : tactic === "奇" ? 1.03 : 1.0;
-  return attrPower * (0.6 + hs * 0.5) * proficient * fit * counter * statusMul(p) * tacticMul * (0.92 + rand() * 0.16);
+  // 单局状态波动：原本 ±8%/人，5 个位置累积后战力比波动 ±5%，
+  // 把玩家的 BP/训练/体能影响（±1~2%）完全淹没。收敛到 ±3%，让决策可被感知；
+  // 「意外」交给局内事件（swing），那是玩家看得见、能归因的。
+  return attrPower * (0.6 + hs * 0.5) * proficient * fit * counter * statusMul(p) * tacticMul * (0.97 + rand() * 0.06);
 }
 function teamPower(team) {
   let tot = 0;
@@ -911,7 +946,7 @@ function commitGame(b) {
     const win = s.myScore > s.opScore;
     const phaseMul = s.kind === "playoff" ? 2 : 1;
     s.rewards = {
-      money: Math.round((win ? randInt(42, 98) : randInt(7, 28)) * phaseMul),
+      money: Math.round((win ? randInt(20, 40) : randInt(6, 14)) * phaseMul),   // 与 AI 同规则（awardTeamMatch）
       fans: Math.round((win ? randInt(5000, 15000) : -randInt(1000, 6000)) * (1 + myT.prestige / 150)),
       win
     };
@@ -1058,13 +1093,13 @@ function prestigeNext(p) { for (const x of [20, 40, 60, 80]) if (p < x) return x
 const EVENTS = [
   { title: "选手状态火热", weight: 10, text: "队内一名选手近期手感爆棚，训练赛屡屡打出高光操作。",
     apply: () => { const p = randomStarter(getMyTeam()); p.status = "hot"; p.statusRounds = 3; return `【${p.name}】进入火热状态，未来 3 轮属性提升！`; } },
-  { title: "突发伤病", weight: 9, text: "一名首发选手在训练中扭伤，需要休养。",
+  { title: "突发伤病", weight: 9, bad: true, text: "一名首发选手在训练中扭伤，需要休养。",
     apply: () => { const p = randomStarter(getMyTeam()); p.status = "inj"; p.statusRounds = randInt(2, 3); return `【${p.name}】受伤，将伤停 ${p.statusRounds} 轮，请到【阵容】调整首发！`; } },
   { title: "赞助商青睐", weight: 8, text: "一家电竞外设品牌看中战队人气，送来一笔赞助。",
     apply: () => { const bonus = Math.round(getMyTeam().prestige / 10) * 10; const m = randInt(55, 140) + bonus; getMyTeam().money += m; return `获得赞助资金 +${m} 万（声望加成 +${bonus}）！`; } },
   { title: "粉丝暴涨", weight: 8, text: "上一场精彩操作被剪成集锦，全网刷屏。",
     apply: () => { const f = Math.round(randInt(3000, 12000) * (1 + getMyTeam().prestige / 120)); getMyTeam().fans += f; return `粉丝 +${f}！人气水涨船高。`; } },
-  { title: "队内矛盾", weight: 6, text: "两名选手因战术分歧发生争执，影响更衣室氛围。",
+  { title: "队内矛盾", weight: 6, bad: true, text: "两名选手因战术分歧发生争执，影响更衣室氛围。",
     apply: () => { const ps = getMyTeam().players; const all = POS.flatMap(p => ps[p]); const a = choice(all), b = choice(all); a.me = clamp(a.me - 4, 40, a.ceil); b.me = clamp(b.me - 4, 40, b.ceil); a.status = "low"; b.status = "low"; a.statusRounds = Math.max(a.statusRounds, 2); b.statusRounds = Math.max(b.statusRounds, 2); return `【${a.name}】与【${b.name}】心态下滑，低迷 2 轮。`; } },
   { title: "青训惊喜", weight: 7, text: "二队一名小将表现惊艳，可上调一队。",
     apply: () => { const t = getMyTeam(); const pos = choice(POS); const rookie = takeFreeAgent(pos); t.players[pos].push(rookie); return `青训提拔【${rookie.name}】（${ratingForOvr(rookie.ovr)}/总评${rookie.ovr}）加入 ${POS_NAME[pos]} 轮换！`; } },
@@ -1079,11 +1114,14 @@ function nextOpponent() {
   if (S.pendingPlayoff && S.pendingPlayoff.oppId) return S.teams.find(t => t.id === S.pendingPlayoff.oppId);
   return null;
 }
-function maybeEvent() {
+function maybeEvent(opts) {
+  // safe：开局/新赛季首日只允许中性或正面事件。否则会出现「刚开档还没打一场，
+  // 主力就在训练中伤停 3 轮」，队伍战力直接掉一个位置，玩家会觉得选秀崩了。
+  const pool = (opts && opts.safe) ? EVENTS.filter(e => !e.bad) : EVENTS;
   if (rand() < 0.7) {
-    const total = EVENTS.reduce((s, e) => s + e.weight, 0);
-    let r = rand() * total, ev = EVENTS[0];
-    for (const e of EVENTS) { r -= e.weight; if (r <= 0) { ev = e; break; } }
+    const total = pool.reduce((s, e) => s + e.weight, 0);
+    let r = rand() * total, ev = pool[0];
+    for (const e of pool) { r -= e.weight; if (r <= 0) { ev = e; break; } }
     S.event = { title: ev.title, text: ev.text, msg: ev.apply() };
   } else S.event = null;
 }
@@ -1111,6 +1149,10 @@ function resolveAI(name) {
   const B = S.bracket, SL = B.slots[name], R = B.resolved;
   if (!R[name] && SL && SL.a && SL.b) {
     const A = S.teams.find(t => t.id === SL.a), Bt = S.teams.find(t => t.id === SL.b);
+    // 与玩家同规则：季后赛每场前有「休整日」，否则 AI 会带着常规赛末的残血打 BO7
+    [A, Bt].forEach(tm => {
+      if (tm) POS.forEach(pos => tm.players[pos].forEach(p => { p.st = clampSt(p, p.st + PLAYOFF_REST_GAIN); }));
+    });
     const r = simAiSeries(A, Bt, 7); // 季后赛全部 BO7（3:3 时第 7 局自动为巅峰对决）
     const aWin = r.sa > r.sb;
     const w = aWin ? SL.a : SL.b, l = aWin ? SL.b : SL.a;
@@ -1162,10 +1204,10 @@ function playoffMyNext() {
    赛季初给 1 个主目标 + 1 个青年培养目标，赛季结束结算：达成给预算与声望，未达成扣预算。
    让中期有压力、有方向，而不是"只要不破产就一直打"。 */
 const KPI_REWARD = {
-  champion: { money: 200, prestige: 6, penaltyMoney: 80, penaltyPrestige: 4 },
-  final: { money: 150, prestige: 5, penaltyMoney: 60, penaltyPrestige: 3 },
-  playoff: { money: 100, prestige: 3.5, penaltyMoney: 45, penaltyPrestige: 2.5 },
-  top6: { money: 70, prestige: 2.5, penaltyMoney: 35, penaltyPrestige: 2 }
+  champion: { money: 120, prestige: 6, penaltyMoney: 70, penaltyPrestige: 4 },
+  final: { money: 90, prestige: 5, penaltyMoney: 50, penaltyPrestige: 3 },
+  playoff: { money: 65, prestige: 3.5, penaltyMoney: 38, penaltyPrestige: 2.5 },
+  top6: { money: 45, prestige: 2.5, penaltyMoney: 28, penaltyPrestige: 2 }
 };
 function makeKpi() {
   const t = getMyTeam();
@@ -1271,7 +1313,7 @@ function newSeason() {
   S.season++;
   returnAllLoans();   // 先把租借球员退回原队
   // 先发赛季奖金再谈合同：否则刚打完季后赛却因为账上没钱而放走主力
-  const bonus = S.champion ? 140 : (r.playoff || r.final ? 85 : 42);
+  const bonus = S.champion ? 90 : (r.playoff || r.final ? 55 : 28);
   t.money += bonus;
   // 赛季末：年龄按「3 赛季 = 1 岁」结算，27 岁起逐季下滑；合同 -1（按赛季）
   const ageInfo = agePlayers();
@@ -1327,7 +1369,7 @@ function newSeason() {
   S.series = null; S.bracket = null; S.pendingPlayoff = null; S.event = null;
   S.page = "main"; S.tab = "schedule";
   toast(`第 ${S.season} 赛季开始！赛季奖金 +¥${bonus}万 · 转会窗口开启`);
-  maybeEvent();
+  maybeEvent({ safe: true });   // 开局/新赛季首日不出伤病
   // 赛季年 + 合同结算合并成一条消息（优先于随机事件，避免信息丢失）
   const rep = [];
   if (ageInfo.tick) rep.push(`🎂 <b>新赛季年</b>：3 个赛季 = 1 岁，全联盟年龄 +1${ageInfo.aged.length ? `（本队：${ageInfo.aged.join("、")}）` : ""}`);

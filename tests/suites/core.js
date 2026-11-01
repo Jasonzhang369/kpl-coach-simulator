@@ -37,14 +37,18 @@ module.exports = function (env, H) {
     ok("进入局间", S().series.sub === "sub");
     T.renderSeries();
     ok("局间标题「第 2 局前」", root().indexOf("第 2 局前") >= 0);
-    if (S().series.nextSideBy === "me") {
-      T.handleAct("chooseside:blue");
-      const once = S().series.nextSide;
-      T.handleAct("chooseside:red");
-      T.handleAct("chooseside:blue");
-      ok("选边锁定", S().series.sideLocked === true);
-      ok("重复点击不改阵营", S().series.nextSide === once, once + "→" + S().series.nextSide);
-    }
+    // 选边功能只在「我上局落败」时出现；比赛结果随机，这里强制构造该状态，
+    // 否则这两条断言会随结果被跳过（曾导致断言总数在 151~153 间跳动）。
+    S().series.nextSideBy = "me";
+    S().series.nextSide = null;
+    S().series.sideLocked = false;
+    T.renderSeries();
+    T.handleAct("chooseside:blue");
+    const once = S().series.nextSide;
+    T.handleAct("chooseside:red");
+    T.handleAct("chooseside:blue");
+    ok("选边锁定", S().series.sideLocked === true);
+    ok("重复点击不改阵营", S().series.nextSide === once, once + "→" + S().series.nextSide);
     T.newGameDraft();
     ok("gameIndex 自增到 1", S().series.gameIndex === 1, S().series.gameIndex);
     ok("第 2 局 BP 页", (() => { T.renderSeries(); return root().indexOf("第 2 局") >= 0; })());

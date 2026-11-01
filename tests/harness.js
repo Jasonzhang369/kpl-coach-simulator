@@ -77,6 +77,7 @@ globalThis.__T = {
   STAFF_DEFS, staffLevel, staffWage, staminaCostPerGame, restGain, intelSize, hireStaff, applyStaffPassive,
   PERSONAS, personaOf, rollPersona, makeKpi, evaluateKpi, recordHistory,
   battleWinRate, skipBattle, POWER_SCALE, profScale: 0,
+  AUTO_BP, BASE_MASTERY, LANE_PICK_FLOOR, wearTeamStamina,
   autoBpStepSafe: 0
 };
 `;
@@ -97,7 +98,7 @@ globalThis.__T = {
 let pass = 0, fail = 0, curSuite = "";
 const failures = [];
 function ok(msg, cond, extra) {
-  if (cond) { pass++; return true; }
+  if (cond) { pass++; if (process.env.DUMP_PASS) console.log("PASS| " + curSuite + " | " + msg); return true; }
   fail++;
   failures.push(`[${curSuite}] ${msg}${extra !== undefined ? " → " + extra : ""}`);
   return false;

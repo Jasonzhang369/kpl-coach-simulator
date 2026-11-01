@@ -719,11 +719,11 @@ function renderFormat() {
   <div class="report-line"><span class="tag key">英雄熟练</span><span class="body">每名选手有 6 个英雄的<b>熟练度 0~100</b>，直接乘进战力（绝活 ≈×1.11、可用 ≈×1.03、生疏 ≈×0.94）——所以"会用"比"版本强"更值钱。在【训练】页点 <b>🎯 英雄熟练</b> 可练某个英雄（1 训练点，+5~9），也可以花 2 训练点<b>学新英雄</b>（应对全局 BP 被 ban 光）。BP 选将台上的 <b>★数字</b> 就是熟练度。</span></div>
   <div class="report-line"><span class="tag key">对手风格</span><span class="body">每支 AI 战队有<b>战术人格</b>：四保一 / 野核 / 打架队 / 运营流 / 中野联动 / 全英雄池。人格只是把对应分路与定位的打分抬高 <b>3~8%</b>，<b>不是固定套路</b>——同一支队在不同局依然会选出不同阵容，只是整体更偏某种风格。赛程页与系列赛页会显示对手风格。</span></div>
   <div class="report-line"><span class="tag key">胜负判定</span><span class="body">一场比赛 = <b>赛前战力对比 → 赛前胜算 → 局内事件 → 结算</b>。<b>赛前胜算</b>由双方战力差决定（战力尺度 ${POWER_SCALE}：3% 战力差 ≈ 60% 胜率，不是一锤定音）。<b>局内事件会真正改变结果</b>：抢暴君、抢主宰、ACE、偷家、核心失误……都会累积成 <b>swing</b>，越到后期权重越高，最后一分钟用「赛前胜算 + 全部 swing」摇出胜负。<b>跳过战斗不会作弊</b>——它只是把剩余分钟快进跑完，概率分布与逐分钟观看完全一致。</span></div>
-  <div class="report-line"><span class="tag key">经济</span><span class="body">收入已收紧：<b>系列赛</b>胜利约 ¥42~98 万（季后赛 ×2）、失利 ¥7~28 万，另有同额的联盟分成；<b>赛季奖金</b> 冠军 140 / 进季后赛 85 / 其他 42 万；<b>粉丝见面会</b>与粉丝数、声望挂钩（每赛季 2 次）；赞助事件 55~140 万 + 声望加成。<b>支出</b>：特训 5~11 万/次、突破上限约 290~330 万、<b>转会按身价</b>（总评 90 约 376 万，卖出仅回收 50%）、<b>续约 = 身价 50%</b>、教练组工资。<b>一个赛季正常运营下来，通常只够补 1~2 个关键位置。</b></span></div>
+  <div class="report-line"><span class="tag key">经济</span><span class="body">玩家与其他 11 队<b>完全同一套收入规则</b>：<b>系列赛</b>胜利 ¥20~40 万（季后赛 ×1.8）、失利 ¥6~14 万；<b>赛季奖金</b> 冠军 90 / 进季后赛 55 / 其他 28 万；<b>董事会目标</b>达成 45~120 万、未达成倒扣；<b>粉丝见面会</b>与粉丝数、声望挂钩（每赛季 2 次）；赞助事件 55~140 万 + 声望加成。<b>支出</b>：特训 5~11 万/次、突破上限约 290~330 万、<b>转会按身价</b>（总评 90 约 376 万，卖出仅回收 50%）、<b>续约 = 身价 50%</b>、教练组工资。<b>一个赛季正常运营下来，通常只够补 1 个关键位置，或练满一整队。</b></span></div>
   <div class="report-line"><span class="tag key">粉丝运营</span><span class="body">每赛季可举办 <b>2 次粉丝见面会</b>，收入与<b>粉丝数、声望</b>挂钩（粉丝越多赚得越多），并小幅涨粉。入口在【战队】页。</span></div>
   <div class="report-line"><span class="tag key">失败条件</span><span class="body"><b>声望降到 0 即游戏失败（GAME OVER）</b>：连续失利每场 −1.2（季后赛 −2）、无缘季后赛 −8、卖掉 85+ 主力 −3。声望低于 10 时【战队】页会红字警告。</span></div>
   <div class="report-line"><span class="tag key">积分榜</span><span class="body">前 <b>4 名高亮</b>并标出<b>晋级线</b>。并列时依次比较：① 积分（胜 +2）→ ② <b>小分</b>（系列赛净胜局 = 拿下局数 − 丢掉局数）→ ③ <b>相互战绩</b>（两队直接交手）→ ④ 总胜场 → ⑤ 总负场。</span></div>
-  <div class="report-line"><span class="tag key">体能</span><span class="body">每局消耗 <b>${staminaCostPerGame()}</b> 体能（下限 ${STAMINA_FLOOR}，有体能教练会降低）；≤60 标「体能偏低」、≤45 标「体力告急」红标。恢复途径：<b>轮间自然 +${ROUND_STAMINA_GAIN}</b>（每轮开赛前）· <b>全队休息 +${restGain()}</b>（2 训练点，<b>只有大场打完后才能休息</b>，系列赛局间不可）· 赛季重置 +25。系列赛局间只能<b>换人</b>或<b>一键轮换</b>。</span></div>
+  <div class="report-line"><span class="tag key">体能</span><span class="body">每局消耗 <b>${staminaCostPerGame()}</b> 体能（下限 ${STAMINA_FLOOR}，有体能教练会降低）；≤60 标「体能偏低」、≤45 标「体力告急」红标。恢复途径：<b>轮间自然 +${ROUND_STAMINA_GAIN}</b>（每轮开赛前）· <b>全队休息 +${restGain()}</b>（2 训练点，<b>只有大场打完后才能休息</b>，系列赛局间不可）· <b>季后赛每场开赛前 +${PLAYOFF_REST_GAIN}</b>（休整日，AI 同规则）· 赛季重置 +25。系列赛局间只能<b>换人</b>或<b>一键轮换</b>。</span></div>
   <div class="report-line"><span class="tag key">年龄合同</span><span class="body"><b>3 个赛季 = 1 岁</b>：第 4、7、10… 赛季开始时全联盟年龄 +1（顶栏显示「第 N 年」）。<b>26 岁以上开始衰退</b>，而且是<b>逐季</b>掉：<b>27~29 岁</b>每赛季操作/意识/配合/心态 <b>−1</b>、成长上限 −1；<b>30 岁起</b>每赛季 <b>−2</b>、上限 −2（练不回来）。≤26 岁仍有成长机会（21 岁以下最高，27 岁起不再成长）。<b>合同按赛季计（2~6 赛季）</b>，赛季末 −1；到期自动续约（身价 50%，主力或 A 级以上且资金足够），否则<b>离队进自由身池</b>；也可在【战队】页手动续约（3~6 赛季）。</span></div>
   <div class="report-line"><span class="tag key">赛中租借</span><span class="body">转会窗口关闭后，仍可从其他战队<b>租借替补</b>：租费 = 身价 <b>25%</b>，期限 <b>3 轮</b>，到期<b>自动返回原队</b>。每赛季限 <b>${S.maxLoans || 1}</b> 次，入口在【转会】页。</span></div>
   <div class="report-line"><span class="tag key">难度</span><span class="body"><b>难度 = 对手的 BP 水平</b>，<b>不改动任何战力/属性</b>：<b>新秀</b> 会犯小错——多数回合只按版本强度 ban（很少主动针对你的英雄池）、基本不读克制、偶尔拿舒适英雄，但仍会认分路、挑强度高的英雄；<b>职业</b> 会读克制、照顾自家选手擅长、补阵容前排与输出，ban 会瞄着你的核心；<b>传奇</b> 近乎最优，几乎总拿最强解，ban 基本必中你的第一核心。<b>名单模式</b>（平衡选秀 / 真实大名单）是另一个维度，只决定 12 队怎么分人；<b>真实大名单下对手 BP 固定按「传奇」</b>。</span></div>
@@ -838,7 +838,10 @@ function renderPendingCard(name) {
    （偶尔放过克制、偶尔随到次优英雄、ban 有时不盯着对面绝活），
    但不会把英雄塞到不该去的分路（同样遵守 LANE_PICK_FLOOR）。
    传奇难度（含真实大名单）直接禁用一键 BP，必须手动 ban/选。 */
-const AUTO_BP = { noise: 0.21, topN: 5, profW: 0.65, fitW: 0.82, counterW: 0.50, banTop: 2, banTargetRate: 0.75 };
+/* 一键 BP 的水平：比「职业 AI」更粗糙（判断噪声更大、不补阵容、克制只做到一半），
+   但不会故意牺牲熟练度——熟练度是硬信息，谁都会看；差别在「判断」，不在「明知故犯」。
+   实测阵容质量介于新秀 AI 与职业 AI 之间，对新秀胜率比职业高 ~12pp。 */
+const AUTO_BP = { noise: 0.22, topN: 6, profW: 0.90, fitW: 0.80, counterW: 0.40, banTop: 2, banTargetRate: 0.75 };
 function autoBpAllowed() { return aiBpLevel() !== "传奇"; }
 function myAutoBan() {
   if (!autoBpAllowed()) return null;

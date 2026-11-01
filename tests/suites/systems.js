@@ -132,8 +132,14 @@ module.exports = function (env, H) {
     }
     const protect = firstPickLane("protect");
     const jungle = firstPickLane("jungleCore");
-    ok("四保一更爱先拿发育路", (protect.bot || 0) > (jungle.bot || 0), `${protect.bot || 0} vs ${jungle.bot || 0}`);
+    // 行为侧只看「方向」且用组合口径：单看 bot 的样本量太小（四保一首选更常是辅助/前排），
+    // 会随随机数抖动；权重表本身（下面两条）才是确定性判据。
+    const botSide = o => (o.bot || 0) + (o.support || 0);
+    ok("四保一更偏向发育路+辅助", botSide(protect) > botSide(jungle), `${botSide(protect)} vs ${botSide(jungle)}`);
     ok("野核更爱先拿打野", (jungle.jungle || 0) > (protect.jungle || 0), `${jungle.jungle || 0} vs ${protect.jungle || 0}`);
+    const P = k => T.PERSONAS.find(p => p.key === k) || { pos: {} };
+    ok("人格表：四保一对发育路权重 > 野核", (P("protect").pos.bot || 1) > (P("jungleCore").pos.bot || 1));
+    ok("人格表：野核对打野权重 > 四保一", (P("jungleCore").pos.jungle || 1) > (P("protect").pos.jungle || 1));
   });
 
   suite("英雄熟练度", () => {
@@ -158,5 +164,56 @@ module.exports = function (env, H) {
     T.renderSeries();
     ok("BP 页出现熟练度标记", root().indexOf("★") >= 0);
     ok("熟练度标记是数字", /★\d+/.test(root()), (root().match(/★\d+/) || [])[0]);
+  });
+
+  /* ---- 平衡性回归：这几个坑修过一次，别再退回去 ---- */
+  suite("平衡", () => {
+    // 1) 池外英雄不是 0 熟练度（否则第 2 局起全联盟统一 0.94，熟练度系统只剩第 1 局有效）
+    H.newGame(env, { difficulty: "职业" });
+    const p = me().players.top[0];
+    ok("池外英雄有基础熟练度", T.profOf(p, "池外英雄不存在") >= 1.0, T.profOf(p, "池外英雄不存在"));
+    ok("绝活明显强于池外", T.profOf(p, p.heroPool[0]) > T.profOf(p, "池外英雄不存在") + 0.03);
+
+    // 2) 玩家比赛里的对手 AI 也要掉体能（曾经只有玩家掉，11 轮后 AI 99 / 玩家 36）
+    S().transferWindow = false;
+    const opp = S().teams.find(t => t.id !== S().myTeamId);
+    const oppSt = () => T.POS.reduce((a, q) => a + opp.players[q].find(z => z.id === opp.lineup[q]).st, 0) / 5;
+    const before = oppSt();
+    S().series = null; S().page = "main";
+    T.startSeries(opp.id, 5, "regular", null, "测");
+    S().series.sub = "battle";
+    let g = 0; while (S().series && S().series.sub === "battle" && g++ < 90) T.battleTick();
+    const games = (S().series.games || []).length;
+    if (S().series.sub === "over") T.handleAct("seriescontinue");
+    ok("对手打完系列赛会掉体能", oppSt() < before || games === 0, `${before.toFixed(0)} → ${oppSt().toFixed(0)}（${games} 局）`);
+
+    // 3) 开局不触发负面事件（否则刚开档主力就伤停，战力直接掉一个位置）
+    let bad = 0;
+    for (let i = 0; i < 40; i++) {
+      T.newGame({ difficulty: "职业", rosterMode: "draft", teamName: "成都AG超玩会", slot: 1 });
+      const t = T.getMyTeam();
+      T.POS.forEach(q => t.players[q].forEach(x => { if (x.status === "inj" || x.status === "low") bad++; }));
+    }
+    ok("40 次开档无伤病/低迷", bad === 0, bad);
+
+    // 4) 选秀不再把玩家固定为最强（蛇形起点按位置错开）
+    const ranks = [];
+    for (let i = 0; i < 30; i++) {
+      T.newGame({ difficulty: "职业", rosterMode: "draft", teamName: "成都AG超玩会", slot: 1 });
+      const ps = T.getS().teams.map(t => T.teamPower(t));
+      ranks.push(ps.slice().sort((a, b) => b - a).indexOf(T.teamPower(T.getMyTeam())) + 1);
+    }
+    const firstCount = ranks.filter(r => r === 1).length;
+    ok("玩家不总是战力第一（< 40%）", firstCount / 30 < 0.4, `${firstCount}/30`);
+    ok("玩家名次有分散（至少出现 4 种名次）", new Set(ranks).size >= 4, [...new Set(ranks)].join(","));
+
+    // 5) AI 也会处理伤停首发（换替补；没替补就带伤出战）
+    H.newGame(env, { difficulty: "职业" });
+    const aiT = T.getS().teams.find(t => t.id !== T.getS().myTeamId);
+    const starter = aiT.players.top.find(x => x.id === aiT.lineup.top);
+    starter.status = "inj"; starter.statusRounds = 2;
+    T.advanceRegular();
+    const now = aiT.players.top.find(x => x.id === aiT.lineup.top);
+    ok("AI 轮间处理好伤停首发", !(now && now.status === "inj" && now.statusRounds > 0), now && `${now.name}/${now.status}`);
   });
 };
