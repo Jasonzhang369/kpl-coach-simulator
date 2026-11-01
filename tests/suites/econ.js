@@ -82,6 +82,6 @@ module.exports = function (env, H) {
     const m0 = me().money;
     H.playSeason(env);
     const inc = me().money - m0;
-    ok("整赛季净收入在 200~900 万", inc >= 200 && inc <= 900, inc);
+    ok("整赛季净收入在 200~1800 万（含季后赛与董事会奖金）", inc >= 200 && inc <= 1800, inc);
   });
 };

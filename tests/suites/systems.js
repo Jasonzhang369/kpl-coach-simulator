@@ -1,0 +1,162 @@
+/* 新系统：董事会目标 / 教练组 / 战术人格 / 英雄熟练度 / 战力尺度 / swing 分布 */
+module.exports = function (env, H) {
+  const { T, root } = env;
+  const { ok, suite } = H;
+  const S = () => T.getS();
+  const me = () => T.getMyTeam();
+
+  suite("战力尺度", () => {
+    ok("POWER_SCALE = 34", T.POWER_SCALE === 34, T.POWER_SCALE);
+    // 战力领先 3% 时的胜率应落在"有优势但不碾压"
+    const my = 500, opp = 515;
+    const p = 1 / (1 + Math.pow(10, (opp - my) / T.POWER_SCALE));
+    ok("战力差 3% 时胜率在 25%~40%", p > 0.25 && p < 0.40, p.toFixed(3));
+    const p22 = 1 / (1 + Math.pow(10, (opp - my) / 22));
+    ok("比旧尺度(22)更钝", p > p22, `${p.toFixed(3)} vs ${p22.toFixed(3)}`);
+  });
+
+  suite("swing 参与判定", () => {
+    H.newGame(env, { difficulty: "职业" });
+    T.startSeries(S().schedule[0].oppId, 5, "regular", null, "测");
+    let g = 0; while (S().series.draft && !S().series.draft.over && g++ < 60) T.autoBpStep();
+    const s = S().series, b = s.battle;
+    ok("赛前不决定胜负", b.myWin == null);
+    b.minute = Math.round(b.duration / 2);          // 比赛中段才看 swing 的影响
+    const base = T.battleWinRate(b);
+    b.swing = 0.4; const up = T.battleWinRate(b);
+    b.swing = -0.4; const down = T.battleWinRate(b);
+    ok("swing 正向提升胜算", up > base, `${base.toFixed(3)} → ${up.toFixed(3)}`);
+    ok("swing 负向降低胜算", down < base, `${base.toFixed(3)} → ${down.toFixed(3)}`);
+    b.swing = 0; b.minute = 0;
+    s.sub = "battle";
+    g = 0; while (S().series && S().series.sub === "battle" && g++ < 90) T.battleTick();
+    ok("结束才定胜负", typeof b.myWin === "boolean");
+    ok("记录最终概率", typeof b.finalProb === "number", b.finalProb);
+  });
+
+  suite("董事会目标", () => {
+    H.newGame(env, { difficulty: "职业" });
+    ok("开档即有目标", !!(S().kpi && S().kpi.main && S().kpi.main.title), S().kpi && S().kpi.main.title);
+    ok("目标含奖励/惩罚", S().kpi.reward.money > 0 && S().kpi.penalty.money > 0);
+    // 达成：伪造夺冠结果
+    const t = me(), m0 = t.money;
+    S().seasonResult = { champion: true, final: true, playoff: true, rank: 1 };
+    S().champion = true;
+    S().history = []; S().kpiResult = null; S().kpi = { ...S().kpi, main: { type: "champion", title: "卫冕夺冠", desc: "x" } };
+    const res = T.evaluateKpi();
+    ok("夺冠判定达成", res && res.ok === true);
+    ok("达成后拿到奖金", t.money > m0, `${m0} → ${t.money}`);
+    // 重复调用不会二次发钱
+    const m1 = t.money;
+    T.evaluateKpi();
+    ok("目标只结算一次", t.money === m1, `${m1} → ${t.money}`);
+
+    // 未达成：扣钱（reward/penalty 与 main.type 必须同源，这里手工对齐）
+    const t2 = me(), m2 = t2.money;
+    S().kpiResult = null;
+    S().kpi = { ...S().kpi, main: { type: "champion", title: "卫冕夺冠", desc: "x" },
+      reward: { money: 260, prestige: 8 }, penalty: { money: 80, prestige: 4 } };
+    S().champion = false;
+    S().seasonResult = { rank: 9, champion: false };
+    const res2 = T.evaluateKpi();
+    ok("未达成判定失败", res2 && res2.ok === false);
+    ok("未达成扣钱", t2.money < m2, `${m2} → ${t2.money}`);
+  });
+
+  suite("季末不重复记账", () => {
+    H.newGame(env, { difficulty: "职业" });
+    S().seasonResult = { rank: 5, playoff: true };
+    T.recordHistory();
+    const n1 = S().history.length;
+    T.recordHistory();
+    ok("recordHistory 幂等", S().history.length === n1, `${n1} → ${S().history.length}`);
+  });
+
+  suite("教练组", () => {
+    H.newGame(env, { difficulty: "职业" });
+    ok("初始无职员", T.staffLevel("mental") === 0 && T.staffWage() === 0);
+    const baseSt = T.staminaCostPerGame(), baseRest = T.restGain(), baseIntel = T.intelSize();
+    S().staff = { mental: 2, fitness: 2, analyst: 3 };
+    ok("体能教练降低每局消耗", T.staminaCostPerGame() === baseSt - 2, T.staminaCostPerGame());
+    ok("体能教练提升休息收益", T.restGain() === baseRest + 8, T.restGain());
+    ok("数据分析师增加情报", T.intelSize() === baseIntel + 6, T.intelSize());
+    ok("工资合计 > 0", T.staffWage() > 0, T.staffWage());
+    // 心理教练：每轮回心态 + 清低迷
+    const p = me().players.mid[0];
+    p.me = 60; p.status = "low"; p.statusRounds = 2;
+    T.applyStaffPassive();
+    ok("心理教练提心态", p.me > 60, p.me);
+    ok("2 级心理教练清低迷", p.status === "ok", p.status);
+
+    // 赛季末扣工资（通过赛季初汇报里的文案确认）
+    S().staff = { mental: 1, fitness: 0, analyst: 0 };
+    const wage = T.staffWage();
+    T.newSeason();
+    ok("赛季末扣工资有记录", !!(S().event && S().event.msg && S().event.msg.indexOf("教练组工资") >= 0), S().event && S().event.msg);
+
+    S().staff = { mental: 3, fitness: 3, analyst: 3 };
+    me().money = 0;
+    S().champion = false;
+    S().seasonResult = { rank: 10, champion: false };   // 无季后赛 → 奖金 42，付不起 62 的工资
+    S().kpiResult = { season: S().season, ok: false, youthOk: false, notes: [] };  // 不吃 KPI 奖金
+    T.newSeason();
+    ok("付不起工资会有人离职", T.staffWage() < 62, T.staffWage());
+  });
+
+  suite("战术人格", () => {
+    H.newGame(env, { difficulty: "职业" });
+    ok("每队都有人格", S().teams.every(t => t.persona && T.personaOf(t)), "缺失");
+    const kinds = new Set(S().teams.map(t => T.personaOf(t).key));
+    ok("12 队风格不全相同", kinds.size >= 3, kinds.size);
+    // 人格只是"偏好"，权重必须在 0.9~1.15 之间，不能把对手钉死
+    let inRange = true;
+    T.PERSONAS.forEach(p => {
+      Object.values(p.pos || {}).concat(Object.values(p.arc || {})).forEach(v => { if (v < 0.9 || v > 1.15) inRange = false; });
+    });
+    ok("人格权重是软偏好（0.9~1.15）", inRange);
+    // 人格会影响选人倾向：四保一 vs 野核，看两边首选分路的分布
+    function firstPickLane(key) {
+      const counts = {};
+      for (let i = 0; i < 40; i++) {
+        H.newGame(env, { difficulty: "职业" });
+        S().teams.find(t => t.id === S().myTeamId).persona = key;
+        S().series = null;
+        T.startSeries(S().schedule[0].oppId, 5, "regular", null, "测");
+        S().teams.find(t => t.id === S().series.oppId).persona = key;
+        const d = S().series.draft;
+        T.aiPickTurn({ actor: T.aiSide(d) });
+        const pick = d.picks[T.aiSide(d)][0];
+        if (pick) counts[pick.pos] = (counts[pick.pos] || 0) + 1;
+      }
+      return counts;
+    }
+    const protect = firstPickLane("protect");
+    const jungle = firstPickLane("jungleCore");
+    ok("四保一更爱先拿发育路", (protect.bot || 0) > (jungle.bot || 0), `${protect.bot || 0} vs ${jungle.bot || 0}`);
+    ok("野核更爱先拿打野", (jungle.jungle || 0) > (protect.jungle || 0), `${jungle.jungle || 0} vs ${protect.jungle || 0}`);
+  });
+
+  suite("英雄熟练度", () => {
+    H.newGame(env, { difficulty: "职业" });
+    const p = me().players.top[0];
+    ok("英雄池 6 个", p.heroPool.length === 6, p.heroPool.length);
+    ok("熟练度表齐全", p.heroPool.every(n => T.masteryOf(p, n) >= 45 && T.masteryOf(p, n) <= 96));
+    ok("熟练度影响倍率", T.profOf(p, p.heroPool[0]) > T.profOf(p, "不存在"));
+    const before = T.masteryOf(p, p.heroPool[p.heroPool.length - 1]);
+    const tp = S().trainPoints, m0 = me().money;
+    const lowHero = p.heroPool[p.heroPool.length - 1];
+    T.trainHero(p.id, lowHero);
+    ok("练英雄提升熟练度", T.masteryOf(p, lowHero) > before, `${before} → ${T.masteryOf(p, lowHero)}`);
+    ok("练英雄消耗训练点", S().trainPoints === tp - 1, S().trainPoints);
+    ok("练英雄花钱", me().money < m0, `${m0} → ${me().money}`);
+    // BP 界面显示 ★数值
+    S().series = null;
+    T.startSeries(S().schedule.find(x => !x.played).oppId, 5, "regular", null, "测");
+    const d = S().series.draft;
+    const pickStep = d.steps.findIndex(st => st.type === "pick" && st.actor === d.mySide);
+    d.stepIndex = pickStep;                    // 停在我的选将回合
+    T.renderSeries();
+    ok("BP 页出现熟练度标记", root().indexOf("★") >= 0);
+    ok("熟练度标记是数字", /★\d+/.test(root()), (root().match(/★\d+/) || [])[0]);
+  });
+};

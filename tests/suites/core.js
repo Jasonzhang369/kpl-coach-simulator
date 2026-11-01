@@ -10,7 +10,7 @@ module.exports = function (env, H) {
     ok("12 支战队", S().teams.length === 12, S().teams.length);
     ok("每队五路首发", S().teams.every(t => T.POS.every(p => t.lineup[p])));
     ok("选手有年龄/合同", S().teams.every(t => T.POS.every(p => t.players[p].every(x => x.age >= 17 && x.contract >= 1))));
-    ok("起点资金 250", T.getMyTeam().money === 250, T.getMyTeam().money);
+    ok("起点资金 ≥250（可能触发赞助事件）", T.getMyTeam().money >= 250, T.getMyTeam().money);
     ok("render 不抛错", (() => { try { T.render(); return true; } catch (e) { console.log(e.stack); return false; } })());
 
     H.newGame(env, { difficulty: "传奇", rosterMode: "real" });

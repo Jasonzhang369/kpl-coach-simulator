@@ -74,6 +74,9 @@ globalThis.__T = {
   seasonYear, isAgeYearTick, ageDecline, growthChance, trainCost, priceFor, sellPrice, renewCost, breakCost,
   availBanHeroes, availPickHeroes, filledPos, aiSide, currentStep, POS, POS_NAME,
   profOf, masteryOf, masteryLabel, myBestMastery, stCapOf, trainHero, openHeroTrain,
+  STAFF_DEFS, staffLevel, staffWage, staminaCostPerGame, restGain, intelSize, hireStaff, applyStaffPassive,
+  PERSONAS, personaOf, rollPersona, makeKpi, evaluateKpi, recordHistory,
+  battleWinRate, skipBattle, POWER_SCALE, profScale: 0,
   autoBpStepSafe: 0
 };
 `;

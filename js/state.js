@@ -205,6 +205,7 @@ function handleAct(act) {
   if (cmd === "closetransfer") { const m = document.getElementById("transfer-mask"); if (m) m.remove(); return; }
   if (cmd === "tab") { S.tab = args[0]; if (args[0] === "market" && !S.market) { buildMarket(); save(); } render(); return; }
   if (cmd === "rest") { restTeam(); return; }
+  if (cmd === "hirestaff") { hireStaff(args[0]); return; }
   if (cmd === "train") { doTrain(args[0], args[1]); return; }
   if (cmd === "herotrain") { openHeroTrain(args[0]); return; }
   if (cmd === "setlineup") { setLineup(args[0], args[1]); return; }
@@ -337,6 +338,29 @@ function confirmNewGame() {
 }
 
 /* ---------------- 动作 ---------------- */
+/* ---------------- 教练组聘用 ---------------- */
+function hireStaff(key) {
+  const d = STAFF_DEFS.find(x => x.key === key);
+  if (!d) return;
+  const lv = staffLevel(key), t = getMyTeam();
+  if (lv >= d.max) { toast(d.name + " 已是最高等级"); return; }
+  const cost = d.cost[lv];
+  if (t.money < cost) { toast("资金不足：升级需 ¥" + cost + "万"); return; }
+  confirmDialog({
+    title: (lv ? "升级 " : "聘用 ") + d.name,
+    body: `等级 <b>${lv} → ${lv + 1}</b>，一次性费用 <b style="color:var(--gold)">¥${cost}万</b>，之后每赛季工资 <b>¥${d.wage[lv]}万</b>。<br>效果：${d.effect(lv + 1)}`,
+    okText: "确认"
+  }).then(ok => {
+    if (!ok) return;
+    if (getMyTeam().money < cost) { toast("资金不足"); return; }
+    snapshot(d.name + " Lv." + (lv + 1));
+    getMyTeam().money -= cost;
+    S.staff[key] = lv + 1;
+    S.log.unshift("S" + S.season + " 教练组：" + d.name + " 升至 Lv." + (lv + 1) + "（-¥" + cost + "万）");
+    toast(d.name + " 已升至 Lv." + (lv + 1));
+    save(); render();
+  });
+}
 function restTeam() {
   // 休息只在大场之间可用：系列赛进行中（draft/battle/sub 等）不允许休息，只能在"大场已打完"或回到主界面后休息
   if (S && S.series && S.series.sub !== "over") { toast("系列赛进行中不能全队休息：请先打完本场大场（BO5/BO7 全部打完）再休息"); return; }
@@ -344,10 +368,10 @@ function restTeam() {
   snapshot("全队休息");
   S.trainPoints -= 2;
   POS.flatMap(p => getMyTeam().players[p]).forEach(p => {
-    p.st = clampSt(p, p.st + REST_STAMINA_GAIN); p.me = clamp(p.me + 4, 40, p.ceil);
+    p.st = clampSt(p, p.st + restGain()); p.me = clamp(p.me + 4, 40, p.ceil);
     if (p.status === "low") { p.status = "ok"; p.statusRounds = 0; }
   });
-  toast(`全队休息（-2 训练点）· 体能 +${REST_STAMINA_GAIN}、心态 +4`);
+  toast(`全队休息（-2 训练点）· 体能 +${restGain()}、心态 +4`);
   save(); render();
 }
 function doTrain(attr, pid) {
@@ -618,8 +642,9 @@ function advanceRegular() {
     // 轮间休整：全队（含 AI）自然恢复体能，避免连续 BO5 一路掉到见底
     S.teams.forEach(tm => POS.forEach(pos => tm.players[pos].forEach(p => { p.st = clampSt(p, p.st + ROUND_STAMINA_GAIN); })));
     refreshTrainPoints();
+    const meUp = applyStaffPassive();          // 心理咨询师：每轮回心态
     maybeEvent();
-    toast(`轮间休整：全队体能 +${ROUND_STAMINA_GAIN} · 训练点已补充`);
+    toast(`轮间休整：全队体能 +${ROUND_STAMINA_GAIN}${meUp ? ` · 心态 +${meUp}` : ""} · 训练点已补充`);
     save(); render(); return;
   }
   const sorted = standingsSorted();
@@ -645,6 +670,38 @@ const SAVE_PREFIX = "kpl_coach_save_v9_s";
 const LEGACY_SAVE_KEY = "kpl_coach_save_v4";
 const SLOT_COUNT = 3;
 const LAST_SLOT_KEY = "kpl_coach_last_slot";
+/* 存档版本与迁移：每个函数只负责「从 v-1 升到 v」这一步，load() 里按顺序叠加执行。
+   以后改数据结构时，加一个 SAVE_MIGRATIONS[n] 即可，不用再往 load() 里堆 if。 */
+const SAVE_VERSION = 10;
+const SAVE_MIGRATIONS = {
+  10: s => {
+    (s.teams || []).forEach(tm => POS.forEach(pos => (tm.players[pos] || []).forEach(p => {
+      if (p.age == null) p.age = randInt(18, 27);
+      if (p.stCap == null) p.stCap = stCapForAge(p.age);
+      if (!p.mastery || typeof p.mastery !== "object") {
+        p.mastery = {};
+        (p.heroPool || []).forEach((n, i) => { p.mastery[n] = clamp(90 - i * 6 + randInt(-4, 4), 45, 95); });
+      }
+      if (!Array.isArray(p.heroPool) || !p.heroPool.length) p.heroPool = Object.keys(p.mastery).slice(0, 6);
+      if (p.contract == null) p.contract = randInt(2, 4);
+      if (p.st == null) p.st = clamp(p.st || 80, 40, p.stCap);
+    })));
+    if (!s.staff) s.staff = { mental: 0, fitness: 0, analyst: 0 };
+    if (s.difficulty === "真实") { s.rosterMode = "real"; s.difficulty = "职业"; }
+    if (!s.rosterMode) s.rosterMode = "draft";
+    if (s.saveName == null) s.saveName = "";
+  }
+};
+function migrateSaveData(s) {
+  let v = s.version || 4;
+  while (v < SAVE_VERSION) {
+    v++;
+    const fn = SAVE_MIGRATIONS[v];
+    if (fn) { try { fn(s); } catch (e) { /* 单步迁移失败不影响读档 */ } }
+  }
+  s.version = SAVE_VERSION;
+  return s;
+}
 function slotKey(n) { return SAVE_PREFIX + n; }
 function slotMeta(n) {
   try {
@@ -663,7 +720,7 @@ function slotMeta(n) {
 }
 function save() {
   if (!S) return;
-  S.savedAt = Date.now(); S.version = 9;
+  S.savedAt = Date.now(); S.version = SAVE_VERSION;
   S.slot = clamp(S.slot || 1, 1, SLOT_COUNT);
   const keepUndo = S.undo;
   S.undo = null;                       // 撤销快照只存在内存里，避免存档体积翻倍
@@ -743,7 +800,7 @@ function load(n) {
   try {
     const raw = localStorage.getItem(slotKey(slot));
     if (!raw) { toast("该存档位为空"); S = { page: "title" }; render(); return; }
-    S = JSON.parse(raw);
+    S = migrateSaveData(JSON.parse(raw));
     S.slot = slot;
     S._autoRun = false; S._autoTimer = null; // 读档时不会残留自动BP 计时器
     if (!S.page) S.page = "main";
@@ -770,6 +827,8 @@ function load(n) {
     if (S.loansUsed == null) S.loansUsed = 0;
     if (S.maxLoans == null) S.maxLoans = 1;
     if (!S.contractNotices) S.contractNotices = [];
+    if (!S.staff) S.staff = { mental: 0, fitness: 0, analyst: 0 };
+    if (!S.kpi) S.kpi = makeKpi();
     if (S.undo === undefined) S.undo = null;
     // 旧存档：补齐 AI 战队的资金/声望字段（与玩家同规则的经济体系）
     (S.teams || []).forEach(tm => {

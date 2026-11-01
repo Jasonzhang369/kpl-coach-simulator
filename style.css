@@ -331,3 +331,14 @@ tr.cutline td{
 button:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
 .modal-body b{color:var(--txt)}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ---------- 董事会目标（KPI） ---------- */
+.kpi-card{background:linear-gradient(135deg,rgba(245,197,24,.10),rgba(52,211,224,.06));border:1px solid rgba(245,197,24,.35);border-radius:12px;padding:12px 14px;margin-bottom:14px}
+.kpi-title{font-size:14px;font-weight:800;color:var(--gold)}
+.kpi-row{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;font-size:13px;margin-top:4px}
+
+/* ---------- 英雄熟练度弹窗 ---------- */
+.hero-train-list{max-height:52vh;overflow:auto;padding-right:4px;margin-top:4px}
+.hero-train-row{display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
+.hero-train-row .ht-body{flex:1;min-width:0}
+.hero-train-row .btn{flex:0 0 auto;line-height:1.3;text-align:center}

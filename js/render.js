@@ -282,13 +282,55 @@ function renderTeam() {
     }).join("")}` : "";
   const lowSt = POS.map(p => getPlayer(t, t.lineup[p])).filter(p => p && p.st <= 60);
   return `
+  ${kpiBlockHtml()}
   <div class="section-title">首发阵容 · 声望 ${prestigeTier(t.prestige)}</div>
-  ${lowSt.length ? `<div class="warn mb">⚠ 首发体能偏低：${lowSt.map(p => `${escapeHtml(p.name)}（${Math.round(p.st)}）`).join("、")} — 可到【阵容】用「一键轮换建议」调整，或在【训练】全队休息（-2 训练点 +${REST_STAMINA_GAIN} 体能）。</div>` : ""}
+  ${lowSt.length ? `<div class="warn mb">⚠ 首发体能偏低：${lowSt.map(p => `${escapeHtml(p.name)}（${Math.round(p.st)}）`).join("、")} — 可到【阵容】用「一键轮换建议」调整，或在【训练】全队休息（-2 训练点 +${restGain()} 体能）。</div>` : ""}
   <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(180px,1fr))">${starters.map(p => playerCard(p, true)).join("")}</div>
   <div class="section-title" style="margin-top:18px">替补 / 轮换</div>
   <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(180px,1fr))">${benches.map(p => playerCard(p, false)).join("") || '<div class="muted">暂无替补（可从青训/转会补充）</div>'}</div>
   ${contractBlock}
+  ${staffBlockHtml()}
   ${meetBlock}`;
+}
+/* 董事会赛季目标（KPI） */
+function kpiBlockHtml() {
+  const k = S && S.kpi;
+  if (!k) return "";
+  const res = (S.kpiResult && S.kpiResult.season === S.season) ? S.kpiResult : null;
+  const badge = res
+    ? (res.ok ? '<span class="pill green">已达成</span>' : '<span class="pill red">未达成</span>')
+    : '<span class="pill gold">进行中</span>';
+  return `<div class="kpi-card">
+    <div class="flex-between"><div class="kpi-title">📋 董事会目标 · S${S.season}</div>${badge}</div>
+    <div class="kpi-row"><b>${escapeHtml(k.main.title)}</b><span class="muted">${escapeHtml(k.main.desc)}</span></div>
+    <div class="muted" style="font-size:12.5px">达成 <b class="c-good">+¥${k.reward.money}万 · 声望 +${k.reward.prestige}</b> ／ 未达成 <b class="c-bad">-¥${k.penalty.money}万 · 声望 -${k.penalty.prestige}</b></div>
+    <div class="kpi-row" style="margin-top:6px"><b>🌱 ${escapeHtml(k.youth.title)}</b><span class="muted">${escapeHtml(k.youth.desc)} · 达成 +¥${k.youth.reward.money}万</span></div>
+    ${res ? `<div class="muted" style="font-size:12px;margin-top:8px;line-height:1.7">${res.notes.map(escapeHtml).join("<br>")}</div>` : ""}
+  </div>`;
+}
+/* 教练组（职员）：一次性聘用费 + 每赛季工资 */
+function staffBlockHtml() {
+  const t = getMyTeam();
+  const wage = staffWage();
+  return `<div class="section-title" style="margin-top:18px">教练组</div>
+  <div class="muted mb" style="font-size:12.5px">一次性聘用费 + <b>每赛季工资</b>（赛季末从资金里扣，付不起会有人离职）。当前工资合计 <b style="color:var(--gold)">¥${wage}万/赛季</b>。</div>
+  <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(230px,1fr))">
+    ${STAFF_DEFS.map(d => {
+      const lv = staffLevel(d.key);
+      const max = lv >= d.max;
+      const cost = max ? 0 : d.cost[lv];
+      const can = !max && t.money >= cost;
+      return `<div class="player-card">
+        <h4>${d.icon} ${d.name} <span class="pill ${lv ? "gold" : ""}" style="font-size:10px">Lv.${lv}/${d.max}</span></h4>
+        <div class="muted" style="font-size:12px;min-height:34px">${lv ? d.effect(lv) : "未聘用：没有任何加成"}</div>
+        <div class="muted" style="font-size:11px;margin-top:2px">${max ? "已满级" : `下一级：${d.effect(lv + 1)}`}</div>
+        <div class="flex-between mt">
+          <span class="muted" style="font-size:11.5px">${max ? `工资 ¥${d.wage[lv - 1]}万/季` : `¥${cost}万 · 工资 ¥${d.wage[lv]}万/季`}</span>
+          <button class="btn ${can ? "gold" : "ghost"} sm" data-act="hirestaff:${d.key}" ${can ? "" : "disabled"} aria-label="${lv ? "升级" : "聘用"}${d.name}">${max ? "已满级" : lv ? "升级" : "聘用"}</button>
+        </div>
+      </div>`;
+    }).join("")}
+  </div>`;
 }
 // 粉丝见面会收益：与粉丝数、声望挂钩
 function fanMeetingIncome() {
@@ -344,7 +386,7 @@ function renderTrain() {
   }).join("");
   return `
   <div class="section-title">训练中心（剩余训练点 ${S.trainPoints} · 资金 ¥${t.money}万）</div>
-  <div class="muted mb">特训每次消耗 <b>1 训练点 + ¥（按选手总评 5~11 万）</b>，单项 +1~2（不超过上限）。<b>🎯 英雄熟练</b>：练某个英雄的熟练度（直接乘进战力，绝活 ≈×1.11），也可花 2 点学新英雄应对全局BP。<button class="btn ghost sm" data-act="rest" aria-label="全队休息，消耗 2 训练点，恢复体能 ${REST_STAMINA_GAIN}">全队休息（-2 训练点）</button> 恢复体能心态。练满后可花 <b>${BREAK_PTS} 训练点 + 大量资金</b>「突破上限」。</div>
+  <div class="muted mb">特训每次消耗 <b>1 训练点 + ¥（按选手总评 5~11 万）</b>，单项 +1~2（不超过上限）。<b>🎯 英雄熟练</b>：练某个英雄的熟练度（直接乘进战力，绝活 ≈×1.11），也可花 2 点学新英雄应对全局BP。<button class="btn ghost sm" data-act="rest" aria-label="全队休息，消耗 2 训练点，恢复体能 ${restGain()}">全队休息（-2 训练点）</button> 恢复体能心态。练满后可花 <b>${BREAK_PTS} 训练点 + 大量资金</b>「突破上限」。</div>
   <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(180px,1fr))">${options}</div>`;
 }
 function renderLineup() {
@@ -364,7 +406,7 @@ function renderLineup() {
   }).join("");
   const sug = rotationSuggest(t);
   return `<div class="section-title">排兵布阵</div>
-  <div class="muted mb">点击切换首发。伤病选手（🚑）无法首发。系列赛局间也可在换人界面调整。当前首发平均体能 <b class="${avg <= 55 ? "c-bad" : ""}">${avg}</b>（每局 -${GAME_STAMINA_COST}，每轮自然 +${ROUND_STAMINA_GAIN}；全队休息 +${REST_STAMINA_GAIN} / 2 训练点，<b>仅在大场之间可休息</b>，系列赛局间不行）。</div>
+  <div class="muted mb">点击切换首发。伤病选手（🚑）无法首发。系列赛局间也可在换人界面调整。当前首发平均体能 <b class="${avg <= 55 ? "c-bad" : ""}">${avg}</b>（每局 -${staminaCostPerGame()}，每轮自然 +${ROUND_STAMINA_GAIN}；全队休息 +${restGain()} / 2 训练点，<b>仅在大场之间可休息</b>，系列赛局间不行）。</div>
   <div class="hero-opt mb">
     <button class="btn ${sug.length ? "gold" : "ghost"} sm" data-act="rotate" aria-label="一键轮换建议">🔄 一键轮换建议${sug.length ? `（${sug.length} 处）` : ""}</button>
     ${sug.length ? `<span class="muted" style="font-size:12px;align-self:center">${sug.map(x => `${POS_NAME[x.pos]} ${escapeHtml(x.from.name)}→${escapeHtml(x.to.name)}`).join(" · ")}</span>` : '<span class="muted" style="font-size:12px;align-self:center">当前阵容无需轮换</span>'}
@@ -382,7 +424,7 @@ function renderSchedule() {
     <div class="matchup card" style="padding:18px">
       <div class="center"><div style="font-weight:800;color:var(--gold)">${escapeHtml(t.name)}</div><div class="muted">战力 ${teamPower(t).toFixed(1)}</div></div>
       <div class="vs">VS</div>
-      <div class="center"><div style="font-weight:800">${escapeHtml(opp.name)}</div><div class="muted">战力 ${teamPower(opp).toFixed(1)}</div></div>
+      <div class="center"><div style="font-weight:800">${escapeHtml(opp.name)}</div><div class="muted">战力 ${teamPower(opp).toFixed(1)}</div><div class="muted" style="font-size:11px">风格：${personaOf(opp).name}</div></div>
     </div>
     <div class="muted mt">赛前评估：${diffTxt}。每局都会 BP（全局BP）。可在【阵容】调整首发、【训练】补强、【转会】引援后开打。</div>
     ${S.transferWindow ? `<div class="warn" style="border-color:rgba(61,220,132,.4);background:rgba(61,220,132,.08);color:var(--green)">🟢 赛季初<b>转会窗口开放中</b>（剩余 ${S.maxTransfers - S.transfersUsed} 次）— 点【转会】买卖选手，<b>打本场后关闭</b>。</div>` : ''}
@@ -401,7 +443,7 @@ function renderSchedule() {
       oppBlock = `<div class="matchup card" style="padding:18px">
         <div class="center"><div style="font-weight:800;color:var(--gold)">${escapeHtml(t.name)}</div><div class="muted">战力 ${teamPower(t).toFixed(1)}</div></div>
         <div class="vs">VS</div>
-        <div class="center"><div style="font-weight:800">${escapeHtml(opp.name)}</div><div class="muted">战力 ${teamPower(opp).toFixed(1)}</div></div>
+        <div class="center"><div style="font-weight:800">${escapeHtml(opp.name)}</div><div class="muted">战力 ${teamPower(opp).toFixed(1)}</div><div class="muted" style="font-size:11px">风格：${personaOf(opp).name}</div></div>
       </div>
       <div class="muted mt">下一场：<b style="color:var(--gold)">${next.label}</b> · BO7（每局BP，全局BP；<b>3:3 进入巅峰对决</b>）</div>
       <button class="btn gold mt" data-act="startmatch">进入系列赛</button>`;
@@ -671,12 +713,17 @@ function renderFormat() {
   <div class="report-line"><span class="tag key">败方选边</span><span class="body">系列赛中<b>上一局的败方</b>有权选择下一局的红/蓝方（蓝方先选、红方后手 Counter）。你落败时可自行选择阵营。</span></div>
   <div class="report-line"><span class="tag key">组合体系</span><span class="body">同队同时选出经典组合（如盾山+艾琳、张良+王昭君、鬼昭吕）可<b>提升全队战力</b>，多个组合可叠加（上限 +18%）。</span></div>
   <div class="report-line"><span class="tag key">转会</span><span class="body">每赛季 <b>${S.maxTransfers}</b> 次转会，<b>仅在赛季初转会窗口开放</b>（打第一场常规赛后关闭）。市场<b>每赛季初自动刷新一次、赛季内不可手动刷新</b>；<b>S 级选手极罕见</b>（约 1/4 的赛季才会出现 1 名）。<b>价格按身价</b>：总评 80 ≈ ¥266 万、90 ≈ ¥376 万，<b>卖出只回收 50%</b>。<b>其他 11 支战队与玩家完全同规则</b>：起点资金 250 万、声望 45、选手评分相近，通过比赛赚取资金/粉丝/声望，并在赛季初自动买卖选手——他们完成交易时会弹出通知，也可在【转会】页查看全部动态。</span></div>
-  <div class="report-line"><span class="tag key">训练</span><span class="body">特训每次消耗 <b>1 训练点 + 资金</b>（按选手总评 5~11 万，越强越贵），单项 +1~2 且不超过上限。练满后可花 <b>${BREAK_PTS} 训练点 + 大量资金</b>（约 290~330 万）<b>突破上限</b> +1~2，继续成长（执行前二次确认）；<b>27 岁以上已过巅峰，不能突破上限</b>。<b>全队休息</b>：2 训练点 → 体能 +${REST_STAMINA_GAIN}、心态 +4。每次特训/休息都可<b>撤销</b>。</span></div>
-  <div class="report-line"><span class="tag key">经济</span><span class="body">收入已收紧：<b>系列赛</b>胜利约 ¥42~98 万（季后赛 ×2）、失利 ¥7~28 万，另有同额的联盟分成；<b>赛季奖金</b> 冠军 140 / 进季后赛 85 / 其他 42 万；<b>粉丝见面会</b>与粉丝数、声望挂钩（每赛季 2 次）；赞助事件 55~140 万 + 声望加成。<b>支出</b>：特训 5~11 万/次、突破上限约 290~330 万、<b>转会按身价</b>（总评 90 约 376 万，卖出仅回收 50%）、<b>续约 = 身价 50%</b>。一个赛季正常运营下来，通常只够补 1~2 个关键位置。</span></div>
+  <div class="report-line"><span class="tag key">训练</span><span class="body">特训每次消耗 <b>1 训练点 + 资金</b>（按选手总评 5~11 万，越强越贵），单项 +1~2 且不超过上限。练满后可花 <b>${BREAK_PTS} 训练点 + 大量资金</b>（约 290~330 万）<b>突破上限</b> +1~2，继续成长（执行前二次确认）；<b>27 岁以上已过巅峰，不能突破上限</b>。<b>全队休息</b>：2 训练点 → 体能 +${restGain()}、心态 +4。每次特训/休息都可<b>撤销</b>。</span></div>
+  <div class="report-line"><span class="tag key">教练组</span><span class="body">在【战队】页<b>聘用职员</b>（一次性聘用费 + 每赛季工资，赛季末结算，付不起会有人离职）：<b>🧠 心理咨询师</b> 每轮回心态（2 级起自动清低迷）· <b>🏋️ 体能教练</b> 每局体力消耗 -1/级、全队休息 +4/级 · <b>📊 数据分析师</b> 每轮训练点 +1/级、BP 对手情报 +2 个/级。每项 3 级。</span></div>
+  <div class="report-line"><span class="tag key">董事会目标</span><span class="body">每个赛季初董事会给 1 个<b>主目标</b>（卫冕夺冠 / 打进总决赛 / 进入四强 / 常规赛前 6，按上赛季成绩递进）+ 1 个<b>青年目标</b>（赛季末首发里有 ≤22 岁且总评 ≥80 的选手）。<b>达成</b>给预算与声望（最高 +260 万 / +8 声望），<b>未达成扣预算与声望</b>。目标卡片在【战队】页顶部，赛季末结算。</span></div>
+  <div class="report-line"><span class="tag key">英雄熟练</span><span class="body">每名选手有 6 个英雄的<b>熟练度 0~100</b>，直接乘进战力（绝活 ≈×1.11、可用 ≈×1.03、生疏 ≈×0.94）——所以"会用"比"版本强"更值钱。在【训练】页点 <b>🎯 英雄熟练</b> 可练某个英雄（1 训练点，+5~9），也可以花 2 训练点<b>学新英雄</b>（应对全局 BP 被 ban 光）。BP 选将台上的 <b>★数字</b> 就是熟练度。</span></div>
+  <div class="report-line"><span class="tag key">对手风格</span><span class="body">每支 AI 战队有<b>战术人格</b>：四保一 / 野核 / 打架队 / 运营流 / 中野联动 / 全英雄池。人格只是把对应分路与定位的打分抬高 <b>3~8%</b>，<b>不是固定套路</b>——同一支队在不同局依然会选出不同阵容，只是整体更偏某种风格。赛程页与系列赛页会显示对手风格。</span></div>
+  <div class="report-line"><span class="tag key">胜负判定</span><span class="body">一场比赛 = <b>赛前战力对比 → 赛前胜算 → 局内事件 → 结算</b>。<b>赛前胜算</b>由双方战力差决定（战力尺度 ${POWER_SCALE}：3% 战力差 ≈ 60% 胜率，不是一锤定音）。<b>局内事件会真正改变结果</b>：抢暴君、抢主宰、ACE、偷家、核心失误……都会累积成 <b>swing</b>，越到后期权重越高，最后一分钟用「赛前胜算 + 全部 swing」摇出胜负。<b>跳过战斗不会作弊</b>——它只是把剩余分钟快进跑完，概率分布与逐分钟观看完全一致。</span></div>
+  <div class="report-line"><span class="tag key">经济</span><span class="body">收入已收紧：<b>系列赛</b>胜利约 ¥42~98 万（季后赛 ×2）、失利 ¥7~28 万，另有同额的联盟分成；<b>赛季奖金</b> 冠军 140 / 进季后赛 85 / 其他 42 万；<b>粉丝见面会</b>与粉丝数、声望挂钩（每赛季 2 次）；赞助事件 55~140 万 + 声望加成。<b>支出</b>：特训 5~11 万/次、突破上限约 290~330 万、<b>转会按身价</b>（总评 90 约 376 万，卖出仅回收 50%）、<b>续约 = 身价 50%</b>、教练组工资。<b>一个赛季正常运营下来，通常只够补 1~2 个关键位置。</b></span></div>
   <div class="report-line"><span class="tag key">粉丝运营</span><span class="body">每赛季可举办 <b>2 次粉丝见面会</b>，收入与<b>粉丝数、声望</b>挂钩（粉丝越多赚得越多），并小幅涨粉。入口在【战队】页。</span></div>
   <div class="report-line"><span class="tag key">失败条件</span><span class="body"><b>声望降到 0 即游戏失败（GAME OVER）</b>：连续失利每场 −1.2（季后赛 −2）、无缘季后赛 −8、卖掉 85+ 主力 −3。声望低于 10 时【战队】页会红字警告。</span></div>
   <div class="report-line"><span class="tag key">积分榜</span><span class="body">前 <b>4 名高亮</b>并标出<b>晋级线</b>。并列时依次比较：① 积分（胜 +2）→ ② <b>小分</b>（系列赛净胜局 = 拿下局数 − 丢掉局数）→ ③ <b>相互战绩</b>（两队直接交手）→ ④ 总胜场 → ⑤ 总负场。</span></div>
-  <div class="report-line"><span class="tag key">体能</span><span class="body">每局消耗 <b>${GAME_STAMINA_COST}</b> 体能（下限 ${STAMINA_FLOOR}）；≤60 标「体能偏低」、≤45 标「体力告急」红标。恢复途径：<b>轮间自然 +${ROUND_STAMINA_GAIN}</b>（每轮开赛前）· <b>全队休息 +${REST_STAMINA_GAIN}</b>（2 训练点，<b>只有大场打完后才能休息</b>，系列赛局间不可）· 赛季重置 +25。系列赛局间只能<b>换人</b>或<b>一键轮换</b>；<b>一键轮换建议</b>按体能/伤病/低迷自动推荐替补，可在【阵容】与系列赛局间使用。</span></div>
+  <div class="report-line"><span class="tag key">体能</span><span class="body">每局消耗 <b>${staminaCostPerGame()}</b> 体能（下限 ${STAMINA_FLOOR}，有体能教练会降低）；≤60 标「体能偏低」、≤45 标「体力告急」红标。恢复途径：<b>轮间自然 +${ROUND_STAMINA_GAIN}</b>（每轮开赛前）· <b>全队休息 +${restGain()}</b>（2 训练点，<b>只有大场打完后才能休息</b>，系列赛局间不可）· 赛季重置 +25。系列赛局间只能<b>换人</b>或<b>一键轮换</b>。</span></div>
   <div class="report-line"><span class="tag key">年龄合同</span><span class="body"><b>3 个赛季 = 1 岁</b>：第 4、7、10… 赛季开始时全联盟年龄 +1（顶栏显示「第 N 年」）。<b>26 岁以上开始衰退</b>，而且是<b>逐季</b>掉：<b>27~29 岁</b>每赛季操作/意识/配合/心态 <b>−1</b>、成长上限 −1；<b>30 岁起</b>每赛季 <b>−2</b>、上限 −2（练不回来）。≤26 岁仍有成长机会（21 岁以下最高，27 岁起不再成长）。<b>合同按赛季计（2~6 赛季）</b>，赛季末 −1；到期自动续约（身价 50%，主力或 A 级以上且资金足够），否则<b>离队进自由身池</b>；也可在【战队】页手动续约（3~6 赛季）。</span></div>
   <div class="report-line"><span class="tag key">赛中租借</span><span class="body">转会窗口关闭后，仍可从其他战队<b>租借替补</b>：租费 = 身价 <b>25%</b>，期限 <b>3 轮</b>，到期<b>自动返回原队</b>。每赛季限 <b>${S.maxLoans || 1}</b> 次，入口在【转会】页。</span></div>
   <div class="report-line"><span class="tag key">难度</span><span class="body"><b>难度 = 对手的 BP 水平</b>，<b>不改动任何战力/属性</b>：<b>新秀</b> 会犯小错——多数回合只按版本强度 ban（很少主动针对你的英雄池）、基本不读克制、偶尔拿舒适英雄，但仍会认分路、挑强度高的英雄；<b>职业</b> 会读克制、照顾自家选手擅长、补阵容前排与输出，ban 会瞄着你的核心；<b>传奇</b> 近乎最优，几乎总拿最强解，ban 基本必中你的第一核心。<b>名单模式</b>（平衡选秀 / 真实大名单）是另一个维度，只决定 12 队怎么分人；<b>真实大名单下对手 BP 固定按「传奇」</b>。</span></div>
@@ -694,7 +741,13 @@ const OSCM_AXES = [
   { k: 3, label: "机动", a: 180 }
 ];
 function oscmVals(h) { return h ? [h.o, h.s, h.c, h.m] : [0, 0, 0, 0]; }
+// 雷达图缓存：BP 每步都会全页重绘，但双方阵容的 OSCM 图大部分时间没变，
+// 缓存掉纯字符串拼接可以显著降低每步开销（#13 的一部分）
+const _radarCache = new Map();
 function radarSvg(items, size, withLabels) {
+  const key = size + "|" + (withLabels ? 1 : 0) + "|" + items.map(it => it.vals.join(",") + it.color + it.fill).join(";");
+  const hit = _radarCache.get(key);
+  if (hit) return hit;
   const cx = size / 2, cy = size / 2, R = size * (withLabels ? 0.32 : 0.38);
   const pt = (v, a) => {
     const r = R * (clamp(v, 0, 100) / 100), rad = a * Math.PI / 180;
@@ -719,7 +772,10 @@ function radarSvg(items, size, withLabels) {
       s += `<text x="${x.toFixed(1)}" y="${(y + 3.5).toFixed(1)}" font-size="10" fill="#8b96b0" text-anchor="middle">${ax.label}</text>`;
     });
   }
-  return s + `</svg>`;
+  const out = s + `</svg>`;
+  if (_radarCache.size > 400) _radarCache.clear();
+  _radarCache.set(key, out);
+  return out;
 }
 // 阵容 OSCM 均值（用于对比双方风格）
 function lineupOscm(picks) {
@@ -901,7 +957,7 @@ function renderSeries() {
   const myT = getMyTeam(), opp = S.teams.find(t => t.id === s.oppId);
   const head = `${renderTopbar()}<div class="card">
     <div class="section-title">${escapeHtml(s.label)} — ${escapeHtml(myT.name)} vs ${escapeHtml(opp.name)} · BO${s.bestOf}</div>
-    <div class="center muted" style="font-size:12px;margin-bottom:4px">对手 BP 水平：<b style="color:var(--gold)">${escapeHtml(aiBpLabel())}</b>${S.rosterMode === "real" ? "（真实大名单固定按传奇）" : "（由难度决定，不改战力）"}</div>
+    <div class="center muted" style="font-size:12px;margin-bottom:4px">对手 BP 水平：<b style="color:var(--gold)">${escapeHtml(aiBpLabel())}</b>${S.rosterMode === "real" ? "（真实大名单固定按传奇）" : "（由难度决定，不改战力）"} · 风格：<b style="color:var(--cyan)">${escapeHtml(personaOf(opp).name)}</b> <span title="${escapeHtml(personaOf(opp).desc)}">ⓘ</span></div>
     <div class="score-big" style="font-size:30px"><span class="w">${s.myScore}</span> : <span class="l">${s.opScore}</span></div>
     ${d && d.peak
       ? `<div class="center peak-banner" style="margin-bottom:10px"><b>⚡ 第 7 局 · 巅峰对决</b> · 无 ban 位 · 双方盲选 · 不受全局BP限制（此前用过的英雄仍可选）· 双方可选到相同英雄</div>`
@@ -994,14 +1050,14 @@ function renderSeries() {
       <div class="bench" id="bench" data-scroll-id="bench">${benchHtml}</div>`;
   } else if (playerTurn && st && st.type === "ban") {
     const pool = availBanHeroes(true); // ban位池：只去掉对方全局BP用过的
-    const threat = oppThreatHeroes(6);
+    const threat = oppThreatHeroes(intelSize());
     const groups = POS.map(pos => {
       const hs = pool.filter(h => h.pos === pos); if (!hs.length) return "";
       return `<div class="mb" data-lane-group="${pos}"><div class="muted" style="font-size:12px;margin-bottom:4px">${POS_NAME[pos]}</div>
         <div class="hero-opt">${hs.map(h => `<button class="ban-btn" data-act="ban:${h.name}" data-hero="${h.name}" data-lane="${h.pos}" data-mine="${heroInMyPool(h.name) ? 1 : 0}" aria-label="禁用 ${h.name}，${POS_NAME[h.pos]}，${ARC_NAME[h.arc]}">${h.name}<i class="muted" style="font-size:10px"> ${ARC_NAME[h.arc]}</i></button>`).join("")}</div></div>`;
     }).join("");
     const intel = threat.length ? `<div class="intel mb">
-      <div class="intel-h">🎯 对手擅长（按其首发选手英雄池与战力排序，建议优先 ban）</div>
+      <div class="intel-h">🎯 对手擅长（按其首发选手英雄池与战力排序，建议优先 ban，数据分析师等级越高情报越多）</div>
       <div class="hero-opt">${threat.map(t => `<button class="ban-btn threat" data-act="ban:${t.name}" data-hero="${t.name}" aria-label="禁用对手擅长英雄 ${t.name}，由 ${escapeHtml(t.by)} 使用">${t.name}<i class="muted" style="font-size:10px"> ${POS_NAME[t.pos]}·${escapeHtml(t.by)}</i></button>`).join("")}</div>
       ${oppPickHistoryHtml()}
     </div>` : "";
@@ -1281,7 +1337,7 @@ function renderSubBetween(s) {
     sideBlock = `<div class="warn mt">上局对手落败，对手选择了下一局阵营：<b>${sideName(s.nextSide)}</b>。</div>`;
   }
   return `<div class="section-title mt">局间换人（第 ${(s.games || []).length + 1} 局前 · 系列赛 ${s.myScore} : ${s.opScore}）</div>
-  <div class="muted mb">上一局后选手体能下降（每局 -${GAME_STAMINA_COST}）、状态可能波动。当前首发平均体能 <b class="${avg <= 55 ? 'c-bad' : ''}">${avg}</b>${worn.length ? ` · <b class="c-bad">${worn.map(p => POS_NAME[p]).join("/")} 体能告急</b>` : ""}。
+  <div class="muted mb">上一局后选手体能下降（每局 -${staminaCostPerGame()}）、状态可能波动。当前首发平均体能 <b class="${avg <= 55 ? 'c-bad' : ''}">${avg}</b>${worn.length ? ` · <b class="c-bad">${worn.map(p => POS_NAME[p]).join("/")} 体能告急</b>` : ""}。
     <br><b>系列赛进行中不能全队休息</b>（大场打完后才能休息），这段只能靠<b>换人</b>和<b>一键轮换</b>调度体能。</div>
   <div class="hero-opt mb">
     <button class="btn ghost sm" data-act="rotate" aria-label="一键轮换建议，自动换上体能更好的替补">🔄 一键轮换建议</button>
@@ -1320,7 +1376,7 @@ function renderSeriesOver(s) {
     赛后体能：本场 ${s.games.length} 局，首发平均体能 <b>${avgSt}</b>。
     ${tired.length ? `⚠ ${tired.map(p => POS_NAME[p]).join("、")} 体能偏低（≤55）→ 下一轮开始前自动恢复 +${ROUND_STAMINA_GAIN}；本场已结束，现在就可以让队伍休息。` : "队伍体能状况良好，可直接进入下一轮。"}
     <div class="hero-opt" style="margin-top:8px">
-      <button class="btn gold sm" data-act="rest" ${S.trainPoints < 2 ? "disabled" : ""} aria-label="全队休息，消耗 2 训练点，恢复体能 ${REST_STAMINA_GAIN}">🛌 全队休息（-2 训练点 · 体能 +${REST_STAMINA_GAIN}）</button>
+      <button class="btn gold sm" data-act="rest" ${S.trainPoints < 2 ? "disabled" : ""} aria-label="全队休息，消耗 2 训练点，恢复体能 ${restGain()}">🛌 全队休息（-2 训练点 · 体能 +${restGain()}）</button>
       <span class="muted" style="font-size:11.5px;align-self:center">大场已结束，这是本场唯一能休息的时机（剩余训练点 ${S.trainPoints}）</span>
     </div>
   </div>

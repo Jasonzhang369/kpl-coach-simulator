@@ -160,6 +160,7 @@ function posArcPool(pos) {
 function makeTeam(name, tier, players) {
   return {
     id: uid(), name, tier, players, lineup: {},
+    persona: rollPersona(),   // 战术人格：只影响 BP 偏好（±3~8%），不是固定套路
     wins: 0, losses: 0, points: 0,
     // 所有战队（含 AI）起点一致：相同资金、相同声望、相同粉丝量级
     fans: 30000,
@@ -213,11 +214,14 @@ function newGame(opts) {
     transfersUsed: 0, maxTransfers: 3,
     loansUsed: 0, maxLoans: 1, loans: [],
     transferWindow: true, aiTransfers: [], transferSeen: 0,
+    staff: { mental: 0, fitness: 0, analyst: 0 },
+    kpi: null, kpiResult: null,
     fanMeets: 0, maxFanMeets: 2, gameOver: null,
     champion: false, seasonResult: null, history: [],
     contractNotices: [], undo: null, savedAt: Date.now()
   };
   S.maxRegular = S.schedule.length;
+  S.kpi = makeKpi();          // 董事会赛季目标
   buildMarket();          // 赛季初自动刷新转会市场（赛季内不变）
   maybeEvent();
   save();
@@ -312,6 +316,15 @@ function aiSeriesLineup(team, ownUsed, takenNow) {
     return pick || "—";
   });
 }
+// AI 战队打完自己的比赛同样消耗体能（否则它们永远满体力，玩家会被系统性压制）
+function wearTeamStamina(team, games) {
+  if (!team) return;
+  const cost = GAME_STAMINA_COST * Math.max(1, games || 1);
+  POS.forEach(pos => {
+    const p = getPlayer(team, team.lineup[pos]);
+    if (p) p.st = clamp(p.st - cost, STAMINA_FLOOR, 100);
+  });
+}
 // 模拟 AI vs AI 的 BO 系列赛：返回比分与每局双方阵容
 function simAiSeries(aTeam, bTeam, bestOf) {
   const need = Math.ceil(bestOf / 2);
@@ -350,6 +363,7 @@ function simRoundAIFixtures(round) {
     if (!A || !B) { f.played = true; return; }
     const r = simAiSeries(A, B, bestOf);
     f.sa = r.sa; f.sb = r.sb; f.games = r.games; f.played = true;
+    wearTeamStamina(A, r.games.length); wearTeamStamina(B, r.games.length);
     const aWin = r.sa > r.sb;
     const wt = aWin ? A : B, lt = aWin ? B : A;
     wt.wins++; wt.points += 2; wt.streak++;
@@ -380,6 +394,35 @@ const GAME_STAMINA_COST = 5;   // 每局消耗（原 6，连续 BO5 必见底）
 const REST_STAMINA_GAIN = 14;  // 全队休息（2 训练点）
 const ROUND_STAMINA_GAIN = 8;  // 每轮自然恢复
 const STAMINA_FLOOR = 35;
+
+/* ---------------- 教练组（职员） ----------------
+   现实里教练不是自己练属性，而是"配班子"：花钱请人，换长期收益。
+   一次性聘用费 + 每赛季工资（赛季末结算，付不起会有人离职）。 */
+const STAFF_DEFS = [
+  { key: "mental", name: "心理咨询师", icon: "🧠", max: 3, cost: [90, 180, 300], wage: [6, 12, 20],
+    effect: lv => `每轮全队心态 +${lv * 2}；低迷更容易自愈` },
+  { key: "fitness", name: "体能教练", icon: "🏋️", max: 3, cost: [90, 180, 300], wage: [6, 12, 20],
+    effect: lv => `每局体力消耗 -${lv}；全队休息 +${lv * 4} 体能` },
+  { key: "analyst", name: "数据分析师", icon: "📊", max: 3, cost: [100, 200, 320], wage: [7, 14, 22],
+    effect: lv => `每轮训练点 +${lv}；BP 对手情报 +${lv * 2} 个；赛前胜算更精确` }
+];
+function staffLevel(key) { return (S && S.staff && S.staff[key]) || 0; }
+function staffWage() { return STAFF_DEFS.reduce((a, d) => a + (d.wage[staffLevel(d.key) - 1] || 0), 0); }
+function staminaCostPerGame() { return Math.max(2, GAME_STAMINA_COST - staffLevel("fitness")); }
+function restGain() { return REST_STAMINA_GAIN + staffLevel("fitness") * 4; }
+function intelSize() { return 6 + staffLevel("analyst") * 2; }
+// 每轮开赛前的教练组被动收益（心理教练）
+function applyStaffPassive() {
+  const lv = staffLevel("mental");
+  if (!lv) return 0;
+  const t = getMyTeam();
+  if (!t) return 0;
+  POS.forEach(pos => t.players[pos].forEach(p => {
+    p.me = clamp(p.me + lv * 2, 40, p.ceil);
+    if (lv >= 2 && p.status === "low") { p.status = "ok"; p.statusRounds = 0; }
+  }));
+  return lv * 2;
+}
 function staminaLevel(p) { return p.st <= 45 ? "crit" : p.st <= 60 ? "low" : ""; }
 function staminaTagHtml(p) {
   const lv = staminaLevel(p);
@@ -586,10 +629,37 @@ function aiCompFactor(d, side, hero) {
   if (cc < 2 && hero.c >= 70) f *= 1.05;
   return f;
 }
+/* ---------------- AI 战术人格 ----------------
+   注意：人格只是"把某些分路/定位的打分抬高 3~8%"，不是固定套路。
+   所以同一支队伍在不同局、不同对手、不同 BP 顺序下依然会选出不一样的阵容，
+   只是整体上更偏向某种风格。 */
+const PERSONAS = [
+  { key: "protect", name: "四保一", desc: "围绕射手打资源，前排与控制拉满",
+    pos: { bot: 1.07 }, arc: { marksman: 1.06, tank: 1.05, support: 1.05, assassin: 0.94 } },
+  { key: "jungleCore", name: "野核", desc: "资源全给打野，前期入侵抢节奏",
+    pos: { jungle: 1.08 }, arc: { assassin: 1.06, fighter: 1.03, tank: 0.96 } },
+  { key: "brawl", name: "打架队", desc: "全员开团，靠团战滚雪球",
+    pos: { support: 1.03 }, arc: { fighter: 1.06, assassin: 1.03, mage: 1.02, tank: 1.02, marksman: 0.97 } },
+  { key: "macro", name: "运营流", desc: "稳线运营，靠后期阵容厚度",
+    pos: { top: 1.03, support: 1.04 }, arc: { tank: 1.05, support: 1.04, marksman: 1.03, assassin: 0.96 } },
+  { key: "midJungle", name: "中野联动", desc: "中野双游走，抓边打开局面",
+    pos: { mid: 1.06, jungle: 1.05 }, arc: { mage: 1.05, assassin: 1.03, marksman: 0.98 } },
+  { key: "flex", name: "全英雄池", desc: "没有明显偏好，见招拆招", pos: {}, arc: {} }
+];
+function personaOf(team) {
+  const flex = PERSONAS[PERSONAS.length - 1];
+  return (team && team.persona && PERSONAS.find(p => p.key === team.persona)) || flex;
+}
+function rollPersona() {
+  const pool = [];
+  PERSONAS.forEach(p => { const w = p.key === "flex" ? 3 : 1; for (let i = 0; i < w; i++) pool.push(p.key); });
+  return choice(pool);
+}
 function aiPickTurn(st) {
   const s = S.series, d = s.draft, side = st.actor;
   const aiTeam = S.teams.find(t => t.id === s.oppId);
   const cfg = aiBpCfg();
+  const per = personaOf(aiTeam);
   const filled = filledPos(d, side);
   const unfilled = POS.filter(p => !filled.includes(p));
   const pool = availPickHeroes(side);
@@ -610,6 +680,8 @@ function aiPickTurn(st) {
       sc *= 1 + (prof - 1) * cfg.profW;        // 选手擅长（新秀权重低）
       sc *= 1 - (1 - fit) * cfg.fitW;          // 分路匹配（新秀容忍度高一点）
       sc *= 1 + (counter - 1) * cfg.counterW;  // 克制对手（新秀基本不读）
+      // 战术人格：小幅偏好（±3~8%），不是固定套路
+      sc *= (per.pos[pos] || 1) * (per.arc[h.arc] || 1);
       if (cfg.compAware) sc *= aiCompFactor(d, side, h);
       sc *= 1 + cfg.noise * (rand() * 2 - 1);  // 判断噪声 = 失误率
       cands.push({ pos, hero: h, sc });
@@ -828,7 +900,7 @@ function commitGame(b) {
   POS.forEach(pos => {
     const p = getPlayer(myT, myT.lineup[pos]);
     if (!p) return;
-    p.st = clamp(p.st - GAME_STAMINA_COST, STAMINA_FLOOR, 100);
+    p.st = clamp(p.st - staminaCostPerGame(), STAMINA_FLOOR, 100);
     if (p.status === "ok" && rand() < 0.08) { if (rand() < 0.5) { p.status = "hot"; p.statusRounds = 2; } else { p.status = "low"; p.statusRounds = 1; } }
   });
   // 败方选边权（下一局红蓝方由败方决定）
@@ -1043,6 +1115,7 @@ function resolveAI(name) {
     const aWin = r.sa > r.sb;
     const w = aWin ? SL.a : SL.b, l = aWin ? SL.b : SL.a;
     R[name] = { winner: w, loser: l, sa: r.sa, sb: r.sb, games: r.games };
+    wearTeamStamina(A, r.games.length); wearTeamStamina(Bt, r.games.length);
     awardTeamMatch(S.teams.find(t => t.id === w), true, true);  // 季后赛收益更高
     awardTeamMatch(S.teams.find(t => t.id === l), false, true);
   }
@@ -1085,8 +1158,81 @@ function playoffMyNext() {
     return { slot: "gf", oppId: R.ufin.winner, label: "总决赛" };
   }
 }
+/* ---------------- 董事会目标（KPI） ----------------
+   赛季初给 1 个主目标 + 1 个青年培养目标，赛季结束结算：达成给预算与声望，未达成扣预算。
+   让中期有压力、有方向，而不是"只要不破产就一直打"。 */
+const KPI_REWARD = {
+  champion: { money: 200, prestige: 6, penaltyMoney: 80, penaltyPrestige: 4 },
+  final: { money: 150, prestige: 5, penaltyMoney: 60, penaltyPrestige: 3 },
+  playoff: { money: 100, prestige: 3.5, penaltyMoney: 45, penaltyPrestige: 2.5 },
+  top6: { money: 70, prestige: 2.5, penaltyMoney: 35, penaltyPrestige: 2 }
+};
+function makeKpi() {
+  const t = getMyTeam();
+  const r = S.seasonResult || {};
+  let type = "top6";
+  if (S.champion) type = "champion";
+  else if (r.final) type = "final";
+  else if (r.playoff) type = "playoff";
+  else if ((t.prestige || 0) >= 55) type = "playoff";
+  else if ((r.rank || 99) <= 6) type = "playoff";
+  const TITLE = { champion: "卫冕夺冠", final: "打进总决赛", playoff: "进入四强", top6: "常规赛前 6" };
+  const DESC = {
+    champion: "再次捧起总冠军奖杯",
+    final: "至少打进总决赛（BO7）",
+    playoff: "常规赛杀进前 4，进入双败淘汰赛",
+    top6: "常规赛排名前 6（不降级、不垫底）"
+  };
+  const k = KPI_REWARD[type];
+  return {
+    season: S.season,
+    main: { type, title: TITLE[type], desc: DESC[type] },
+    youth: { title: "培养新人", desc: "赛季结束时首发里有 ≤22 岁、总评 ≥80 的选手", reward: { money: 45, prestige: 1 } },
+    reward: { money: k.money, prestige: k.prestige },
+    penalty: { money: k.penaltyMoney, prestige: k.penaltyPrestige }
+  };
+}
+function evaluateKpi() {
+  if (!S || !S.kpi) return null;
+  if (S.kpiResult && S.kpiResult.season === S.season) return S.kpiResult;
+  const r = S.seasonResult || {};
+  const t = getMyTeam();
+  const rank = r.rank || (S.champion ? 1 : null);
+  const type = S.kpi.main.type;
+  let ok = false;
+  if (type === "champion") ok = !!S.champion;
+  else if (type === "final") ok = !!r.final || !!S.champion;
+  else if (type === "playoff") ok = !!r.playoff || !!r.final || !!S.champion;
+  else ok = !!S.champion || !!r.playoff || (rank != null && rank <= 6);
+  const youthOk = POS.some(pos => {
+    const p = getPlayer(t, t.lineup[pos]);
+    return p && (p.age || 99) <= 22 && p.ovr >= 80;
+  });
+  const notes = [];
+  if (ok) {
+    t.money += S.kpi.reward.money;
+    addPrestige(S.kpi.reward.prestige, "达成董事会目标");
+    notes.push(`✅ 主目标达成「${S.kpi.main.title}」：+¥${S.kpi.reward.money}万 · 声望 +${S.kpi.reward.prestige}`);
+  } else {
+    t.money = Math.max(0, t.money - S.kpi.penalty.money);
+    addPrestige(-S.kpi.penalty.prestige, "未达成董事会目标");
+    notes.push(`❌ 主目标未达成「${S.kpi.main.title}」：-¥${S.kpi.penalty.money}万 · 声望 -${S.kpi.penalty.prestige}`);
+  }
+  if (youthOk) {
+    t.money += S.kpi.youth.reward.money;
+    notes.push(`🌱 青年目标达成：+¥${S.kpi.youth.reward.money}万`);
+  } else {
+    notes.push("🌱 青年目标未达成（没有 ≤22 岁首发达到 80 总评）");
+  }
+  S.kpiResult = { season: S.season, ok, youthOk, notes };
+  S.log.unshift(`S${S.season} 董事会：${ok ? "达成" : "未达成"}「${S.kpi.main.title}」`);
+  return S.kpiResult;
+}
 function recordHistory() {
+  // 同一赛季只记一次（赛季结束时已记录过，newSeason 再调时跳过）
+  if (S.history && S.history.some(h => h.season === S.season)) return;
   finalizeAiPrestige();
+  evaluateKpi();
   const t = getMyTeam(), r = S.seasonResult || {};
   // 本赛季我的所有对战（对手/比分/胜负）
   const matches = [];
@@ -1124,6 +1270,9 @@ function newSeason() {
   recordHistory();
   S.season++;
   returnAllLoans();   // 先把租借球员退回原队
+  // 先发赛季奖金再谈合同：否则刚打完季后赛却因为账上没钱而放走主力
+  const bonus = S.champion ? 140 : (r.playoff || r.final ? 85 : 42);
+  t.money += bonus;
   // 赛季末：年龄按「3 赛季 = 1 岁」结算，27 岁起逐季下滑；合同 -1（按赛季）
   const ageInfo = agePlayers();
   const notices = settleContracts();
@@ -1145,15 +1294,25 @@ function newSeason() {
     });
     initLineup(tm);
   });
-  const bonus = S.champion ? 140 : (r.playoff || r.final ? 85 : 42);
   // 赛季奖金按战绩给：AI 战队同样领取（冠军 140 / 季后赛 85 / 其他 42）
   S.teams.forEach(tm => {
     if (tm.id === S.myTeamId) return;
     tm.money += 42 + Math.round(tm.prestige * 0.3) + randInt(0, 28);
     tm.fans = Math.max(1000, Math.round(tm.fans * (1 + (tm.prestige - 30) / 400)));
   });
-  t.money += bonus;
+  // 教练组工资（赛季末结算；付不起就有人离职）
+  const wage = staffWage();
+  let wageNote = "";
+  if (wage > 0) {
+    if (t.money >= wage) { t.money -= wage; wageNote = `教练组工资 -¥${wage}万`; }
+    else {
+      const top = STAFF_DEFS.filter(d => staffLevel(d.key) > 0).sort((a, b) => staffLevel(b.key) - staffLevel(a.key))[0];
+      if (top) { S.staff[top.key] = 0; wageNote = `资金不足，${top.name} 离职（工资 ¥${wage}万未付清）`; }
+    }
+  }
   t.fans = Math.max(1000, Math.round(t.fans * (1 + (t.prestige - 30) / 400)));
+  S.kpi = makeKpi();          // 新赛季目标（按上赛季结果）
+  S.kpiResult = null;
   S.round = 1; S.phase = "regular"; S.champion = false; S.seasonResult = null;
   const _sch2 = buildSchedule(t.id, S.teams);
   S.schedule = _sch2.schedule; S.fixtures = _sch2.fixtures;
@@ -1173,6 +1332,7 @@ function newSeason() {
   const rep = [];
   if (ageInfo.tick) rep.push(`🎂 <b>新赛季年</b>：3 个赛季 = 1 岁，全联盟年龄 +1${ageInfo.aged.length ? `（本队：${ageInfo.aged.join("、")}）` : ""}`);
   if (notices.length) rep.push(...notices);
+  if (wageNote) rep.push(`💼 ${wageNote}`);
   if (rep.length) S.event = {
     title: ageInfo.tick ? "🎂 新赛季年 · 合同结算" : "📄 合同季结算",
     text: ageInfo.tick ? `第 ${S.season} 赛季开始（第 ${seasonYear(S.season)} 年）。27 岁以上的选手整体属性已开始逐季下滑。` : `赛季末共有 ${notices.length} 份到期合同在处理（自动续约或离队）。`,
@@ -1180,7 +1340,7 @@ function newSeason() {
   };
   save(); render();
 }
-function refreshTrainPoints() { S.trainPoints = 8 + Math.floor(getMyTeam().fans / 40000); }
+function refreshTrainPoints() { S.trainPoints = 8 + Math.floor(getMyTeam().fans / 40000) + staffLevel("analyst"); }
 
 
 /* ========== 经济 / 合同 / 年龄 / 租借（从 render.js 归位到规则层） ========== */
