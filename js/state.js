@@ -383,7 +383,8 @@ function doTrain(attr, pid) {
   // 二次确认：一次特训会同时扣训练点与资金，避免误点
   const nameMap = { op: "操作", aw: "意识", co: "配合", me: "心态", st: "体能" };
   snapshot(`${nameMap[attr]}特训·${p.name}`);
-  const gain = randInt(1, 2);
+  // 特训收益：常态 +2~3；23 岁以下额外 +1（年轻选手练得快，「培养新人」KPI 才有意义）
+  const gain = randInt(2, 3) + ((p.age || 22) <= 23 ? 1 : 0);
   const before = p[attr];
   p[attr] = attr === "st" ? clampSt(p, p.st + gain) : clamp(p[attr] + gain, 40, p.ceil);
   S.trainPoints--;
@@ -461,8 +462,8 @@ function openHeroTrain(pid) {
   });
 }
 // 突破上限：需要大量训练点与资金
-const BREAK_PTS = 5;
-function breakCost(p) { return Math.round(150 + p.ovr * 1.9); }
+const BREAK_PTS = 3;   // 突破上限从「奢侈品」变成赛季常规操作（原 5 点 + 321 万，一季最多 1 次）
+function breakCost(p) { return Math.round(90 + p.ovr * 1.3); }
 function isCapped(p) { return p.ceil < 99 && ["op", "aw", "co", "me"].every(a => p[a] >= p.ceil - 1); }
 function trainBreakthrough(pid) {
   const p = getPlayer(getMyTeam(), pid); if (!p) return;

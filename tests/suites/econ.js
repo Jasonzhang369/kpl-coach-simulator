@@ -95,7 +95,7 @@ module.exports = function (env, H) {
     ok("转会 90 分 ≈ 376 万", Math.abs(T.priceFor(90) - 376) <= 4, T.priceFor(90));
     ok("卖出价 = 50%", Math.abs(T.sellPrice({ ovr: 90 }) - T.priceFor(90) * 0.5) <= 1);
     ok("续约 = 身价 50%", T.renewCost({ ovr: 90 }) === Math.round(T.priceFor(90) * 0.5));
-    ok("突破 > 300 万", T.breakCost({ ovr: 90 }) > 300, T.breakCost({ ovr: 90 }));
+    ok("突破 ≈ 180~260 万（赛季常规操作）", T.breakCost({ ovr: 90 }) >= 170 && T.breakCost({ ovr: 90 }) <= 280, T.breakCost({ ovr: 90 }));
 
     H.newGame(env, { difficulty: "职业" });
     const m0 = me().money;

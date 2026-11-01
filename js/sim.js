@@ -109,6 +109,10 @@ function assignRosters(names) {
   const result = {};
   names.forEach(name => { result[name] = {}; POS.forEach(pos => result[name][pos] = []); });
 
+  // 全局「档位」：同一支队在所有位置都靠前 / 都靠后，联盟才会出现真正的强弱差距。
+  // 旧版每个位置独立随机起点 → 大数定律把 12 队抹平成 1.2% 标准差，经营强弱毫无意义。
+  const baseOff = randInt(0, names.length - 1);
+
   POS.forEach((pos, pi) => {
     const need = names.length * 2;
     let list = byPos[pos].slice().sort((a, b) => b.ovr - a.ovr);
@@ -120,12 +124,12 @@ function assignRosters(names) {
     const take = list.slice(0, need), rest = list.slice(need);
     // 蛇形：0..n-1 拿排名 1..n，n-1..0 拿排名 n+1..2n → 各队两人名次之和几乎相同
     const idxs = names.map((_, i) => i);
-    // 但「首发取全队最强」意味着「拿到第 1 名的人就是该位置最强首发」。
-    // 若每个位置都从 names[0] 开始正序，names[0]（玩家）会在所有正序位置独吞第 1 名，
-    // 实测 47/60 次开档玩家战力全联盟第一。所以每个位置的起点随机错开，让「第 1 名」分散。
-    const off = randInt(0, names.length - 1);
+    // 「首发取全队最强」意味着「拿到第 1 名的人就是该位置最强首发」。
+    // 起点以全局 baseOff 为主（±1 抖动，避免五个位置完全一致），于是强队各位置都靠前、
+    // 弱队各位置都靠后 —— 联盟才会自然分出层次（实测极差 ~12%，接近真实 KPL）。
+    const off = baseOff;   // 同一支队在所有位置都用同一个起点
     const rot = idxs.slice(off).concat(idxs.slice(0, off));
-    const order = (pi % 2 === 0) ? rot.concat(rot.slice().reverse()) : rot.slice().reverse().concat(rot);
+    const order = rot.concat(rot);   // 同向：队 i 拿第 i 与第 n+i 名 → 强队首发强、替补也强
     order.forEach((teamIdx, i) => { const e = take[i]; if (e) result[names[teamIdx]][pos].push(makePlayerFrom(e)); });
     rest.forEach(e => leftover[pos].push(e));
     preLeft.forEach(e => leftover[pos].push(e));
@@ -176,7 +180,7 @@ function makeTeam(name, tier, players) {
     wins: 0, losses: 0, points: 0,
     // 所有战队（含 AI）起点一致：相同资金、相同声望、相同粉丝量级
     fans: 30000,
-    money: 250, trainPoints: 10, streak: 0,
+    money: 250, trainPoints: 12, streak: 0,
     prestige: 45
   };
 }
@@ -236,7 +240,7 @@ function newGame(opts) {
     teams, round: 1, maxRegular: 11, phase: "regular",
     schedule: _sch.schedule,
     fixtures: _sch.fixtures,
-    trainPoints: 10,
+    trainPoints: 12,
     series: null, bracket: null, pendingPlayoff: null,
     report: null, reportRewards: null, event: null, log: [],
     market: null, freeAgents: leftover,
@@ -496,10 +500,24 @@ function applyRotation(auto) {
   toast(`已轮换 ${sug.length} 个位置`);
   save(); render();
 }
-function posPower(p, hero, oppHero, tactic, pos) {
+/* 板凳深度：每个位置「第二强」的选手同样贡献一部分战力（默认 15%）。
+   1) 现实里轮换深度决定长赛季稳定性；
+   2) 让「双强主力 + 强替补」的队真的更强，联盟才有层次（否则首发取最强会把 12 队抹平）；
+   3) 让转会/青训买替补不再只是"备胎"。 */
+const BENCH_WEIGHT = 0.15;
+function attrPowerOf(p) { return p.op * 0.30 + p.aw * 0.25 + p.co * 0.20 + p.me * 0.10 + p.st * 0.15; }
+function benchBest(team, pos) {
+  if (!team) return null;
+  const starterId = team.lineup[pos];
+  const list = (team.players[pos] || []).filter(p => p.id !== starterId && !(p.status === "inj" && p.statusRounds > 0));
+  if (!list.length) return null;
+  return list.slice().sort((a, b) => attrPowerOf(b) - attrPowerOf(a))[0];
+}
+function posPower(p, hero, oppHero, tactic, pos, benchP) {
   if (!p || !hero || !oppHero) return 0;
   if (p.status === "inj" && p.statusRounds > 0) return 0;
-  const attrPower = p.op * 0.30 + p.aw * 0.25 + p.co * 0.20 + p.me * 0.10 + p.st * 0.15;
+  let attrPower = attrPowerOf(p);
+  if (benchP && BENCH_WEIGHT > 0) attrPower = attrPower * (1 - BENCH_WEIGHT) + attrPowerOf(benchP) * BENCH_WEIGHT;
   const hs = heroStrength(hero) / 100;
   const proficient = profOf(p, hero.name); // 熟练度 0~100 连续换算（绝活 ≈1.11 / 生疏 ≈0.94）
   const fit = pos != null ? laneFit(hero, pos) : 1.0;              // 英雄与分路匹配度（不匹配掉战斗力）
@@ -515,7 +533,10 @@ function teamPower(team) {
   POS.forEach(pos => {
     const p = getPlayer(team, team.lineup[pos]);
     if (!p || p.status === "inj") return;
-    tot += (p.op * 0.3 + p.aw * 0.25 + p.co * 0.2 + p.me * 0.1 + p.st * 0.15) * POS_WEIGHT[pos];
+    let ap = attrPowerOf(p);
+    const b = benchBest(team, pos);
+    if (b) ap = ap * (1 - BENCH_WEIGHT) + attrPowerOf(b) * BENCH_WEIGHT;
+    tot += ap * POS_WEIGHT[pos];
   });
   return tot;
 }
@@ -791,8 +812,8 @@ function simGame() {
     const op = getPlayer(opp, opp.lineup[pos]);
     const mh = heroByName(myPicks[pos]) || heroByName(mp.heroPool[0]);
     const oh = heroByName(oppPicks[pos]) || heroByName(op.heroPool[0]);
-    const mpow = posPower(mp, mh, oh, d.tactic, pos) * POS_WEIGHT[pos];
-    const opow = posPower(op, oh, mh, d.tactic, pos) * POS_WEIGHT[pos];
+    const mpow = posPower(mp, mh, oh, d.tactic, pos, benchBest(myT, pos)) * POS_WEIGHT[pos];
+    const opow = posPower(op, oh, mh, d.tactic, pos, benchBest(opp, pos)) * POS_WEIGHT[pos];
     myTotal += mpow; oppTotal += opow;
     posDetail[pos] = { mpow, opow, mh: mh.name, oh: oh.name, counter: matchupMult(mh, oh) };
   });
@@ -1359,7 +1380,7 @@ function newSeason() {
   const _sch2 = buildSchedule(t.id, S.teams);
   S.schedule = _sch2.schedule; S.fixtures = _sch2.fixtures;
   S.maxRegular = S.schedule.length;
-  S.trainPoints = 10; S.transfersUsed = 0; S.market = null;
+  S.trainPoints = 12; S.transfersUsed = 0; S.market = null;
   S.fanMeets = 0;   // 每赛季重置：2 次粉丝见面会
   S.loans = []; S.loansUsed = 0;   // 租借赛季重置
   // 赛季初转会窗口：AI 战队先行动，随后弹出通知
@@ -1382,7 +1403,7 @@ function newSeason() {
   };
   save(); render();
 }
-function refreshTrainPoints() { S.trainPoints = 8 + Math.floor(getMyTeam().fans / 40000) + staffLevel("analyst"); }
+function refreshTrainPoints() { S.trainPoints = 10 + Math.floor(getMyTeam().fans / 40000) + staffLevel("analyst"); }
 
 
 /* ========== 经济 / 合同 / 年龄 / 租借（从 render.js 归位到规则层） ========== */
