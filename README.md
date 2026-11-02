@@ -1,5 +1,7 @@
 # KPL 主教练：王者之路
 
+<img src="assets/cover.jpg" alt="KPL 主教练：王者之路" width="100%">
+
 一款纯前端的 KPL 模拟经营游戏。你是战队主教练：选人、训练、转会、按官方规则 BP，带队从常规赛杀进双败淘汰赛，捧起冠军奖杯。
 
 **🎮 在线试玩：<https://jasonzhang369.github.io/kpl-coach-simulator/>**
