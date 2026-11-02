@@ -201,21 +201,32 @@ function renderTopbar() {
   const nav = tabs.map(([k, n], i) => `<button class="${S.tab === k ? 'active' : ''}" data-act="tab:${k}" aria-label="${n}（快捷键 ${i + 1}）" aria-current="${S.tab === k ? "page" : "false"}">${n}${k === "market" && S.transferWindow ? '<span class="dot-open" aria-label="转会窗口开放"></span>' : ""}</button>`).join("");
   return `
   <div class="topbar" role="banner">
-    <div class="team-name">${escapeHtml(t.name)}</div>
-    <div class="stat">S${S.season}·第${seasonYear(S.season)}年·${phaseName}<b>第 ${S.round} 轮</b></div>
-    <div class="stat">资金<b>¥${t.money}万</b></div>
-    <div class="stat">粉丝<b>${t.fans.toLocaleString()}</b></div>
-    <div class="stat">声望<b style="color:${prestigeColor(t.prestige)}">${prestigeTier(t.prestige)} ${Math.round(t.prestige)}</b>${t.prestige <= 10 ? '<b style="color:var(--red2);margin-left:4px">⚠</b>' : ''}</div>
-    <div class="stat">训练点<b>${S.trainPoints}</b></div>
-    <div class="stat">战绩<b>${t.wins}胜${t.losses}负</b></div>
+    <div class="topbar-head">
+      <div class="team-name">${escapeHtml(t.name)}</div>
+      <div class="topbar-tools">
+        <button class="btn ghost sm" data-act="renamecurrent" aria-label="重命名当前存档（存档 ${S.slot || 1}）" title="重命名当前存档（${escapeHtml(S.saveName || t.name)}）">💾</button>
+        <button class="btn ghost sm" data-act="openguide" aria-label="游玩指南" title="游玩指南">📖</button>
+        <button class="btn ghost sm" data-act="opensettings" aria-label="设置（音乐与音效）" title="设置">⚙</button>
+        <button class="btn ghost sm" data-act="showhelp" aria-label="快捷键与帮助（问号键）" title="快捷键 / 帮助（?）">?</button>
+        <button class="btn ghost sm" data-act="gotitle" aria-label="返回首页（会自动存档）" title="返回首页">🏠</button>
+      </div>
+    </div>
+    <div class="topbar-stats">
+      <div class="stat">S${S.season}·第${seasonYear(S.season)}年·${phaseName}<b>第 ${S.round} 轮</b></div>
+      <div class="stat">资金<b>¥${t.money}万</b></div>
+      <div class="stat">粉丝<b>${t.fans.toLocaleString()}</b></div>
+      <div class="stat">声望<b style="color:${prestigeColor(t.prestige)}">${prestigeTier(t.prestige)} ${Math.round(t.prestige)}</b>${t.prestige <= 10 ? '<b style="color:var(--red2);margin-left:4px">⚠</b>' : ''}</div>
+      <div class="stat">训练点<b>${S.trainPoints}</b></div>
+      <div class="stat">战绩<b>${t.wins}胜${t.losses}负</b></div>
+    </div>
     <div class="spacer"></div>
     <div class="nav" role="navigation" aria-label="主菜单">${nav}</div>
-    <button class="btn ghost sm" data-act="renamecurrent" aria-label="重命名当前存档（存档 ${S.slot || 1}）" title="重命名当前存档（${escapeHtml(S.saveName || t.name)}）">💾</button>
-    <button class="btn ghost sm" data-act="openguide" aria-label="游玩指南" title="游玩指南">📖</button>
-    <button class="btn ghost sm" data-act="opensettings" aria-label="设置（音乐与音效）" title="设置">⚙</button>
-    <button class="btn ghost sm" data-act="showhelp" aria-label="快捷键与帮助（问号键）" title="快捷键 / 帮助（?）">?</button>
-    <button class="btn ghost sm" data-act="gotitle" aria-label="返回首页（会自动存档）" title="返回首页">🏠</button>
   </div>`;
+}
+/* 触屏设备（手机/平板）：HTML5 拖拽在移动端支持很差，改用「点英雄 → 点分路」两步操作 */
+function isTouchDevice() {
+  try { return !!(window.matchMedia && window.matchMedia("(pointer:coarse)").matches); }
+  catch (e) { return false; }
 }
 function ratingColor(r) { return { S: "#ff3b30", A: "#f5c518", B: "#34d3e0", C: "#9aa6c4" }[r] || "#9aa6c4"; }
 function playerCard(p, isStarter) {
@@ -289,9 +300,9 @@ function renderTeam() {
   ${kpiBlockHtml()}
   <div class="section-title">首发阵容 · 声望 ${prestigeTier(t.prestige)}</div>
   ${lowSt.length ? `<div class="warn mb">⚠ 首发体能偏低：${lowSt.map(p => `${escapeHtml(p.name)}（${Math.round(p.st)}）`).join("、")} — 可到【阵容】用「一键轮换建议」调整，或在【训练】全队休息（-2 训练点 +${restGain()} 体能）。</div>` : ""}
-  <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(180px,1fr))">${starters.map(p => playerCard(p, true)).join("")}</div>
+  <div class="grid cards-grid">${starters.map(p => playerCard(p, true)).join("")}</div>
   <div class="section-title" style="margin-top:18px">替补 / 轮换</div>
-  <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(180px,1fr))">${benches.map(p => playerCard(p, false)).join("") || '<div class="muted">暂无替补（可从青训/转会补充）</div>'}</div>
+  <div class="grid cards-grid">${benches.map(p => playerCard(p, false)).join("") || '<div class="muted">暂无替补（可从青训/转会补充）</div>'}</div>
   ${contractBlock}
   ${staffBlockHtml()}
   ${meetBlock}`;
@@ -318,7 +329,7 @@ function staffBlockHtml() {
   const wage = staffWage();
   return `<div class="section-title" style="margin-top:18px">教练组</div>
   <div class="muted mb" style="font-size:12.5px">一次性聘用费 + <b>每赛季工资</b>（赛季末从资金里扣，付不起会有人离职）。当前工资合计 <b style="color:var(--gold)">¥${wage}万/赛季</b>。</div>
-  <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(230px,1fr))">
+  <div class="grid wide-grid">
     ${STAFF_DEFS.map(d => {
       const lv = staffLevel(d.key);
       const max = lv >= d.max;
@@ -391,7 +402,7 @@ function renderTrain() {
   return `
   <div class="section-title">训练中心（剩余训练点 ${S.trainPoints} · 资金 ¥${t.money}万）</div>
   <div class="muted mb">特训每次消耗 <b>1 训练点 + ¥（按选手总评 5~11 万）</b>，单项 +1~2（不超过上限）。<b>🎯 英雄熟练</b>：练某个英雄的熟练度（直接乘进战力，绝活 ≈×1.11），也可花 2 点学新英雄应对全局BP。<button class="btn ghost sm" data-act="rest" aria-label="全队休息，消耗 2 训练点，恢复体能 ${restGain()}">全队休息（-2 训练点）</button> 恢复体能心态。练满后可花 <b>${BREAK_PTS} 训练点 + 大量资金</b>「突破上限」。</div>
-  <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(180px,1fr))">${options}</div>`;
+  <div class="grid cards-grid">${options}</div>`;
 }
 function renderLineup() {
   const t = getMyTeam();
@@ -591,6 +602,7 @@ function renderStandings() {
     if (i === 3) rows += `<tr class="cutline"><td colspan="10">✂ 季后赛晋级线 — 前 4 名进入双败淘汰赛</td></tr>`;
   });
   return `<div class="section-title">联盟积分榜 · S${S.season}</div>
+  <div class="only-mobile muted" style="font-size:11.5px;margin:-4px 0 6px">← 左右滑动查看完整榜单 →</div>
   <div class="standings-wrap"><table><thead><tr><th>排名</th><th style="text-align:left">战队</th><th>场次</th><th>胜</th><th>负</th><th>积分</th><th>小分</th><th>粉丝</th><th>资金</th><th>声望</th></tr></thead><tbody>${rows}</tbody></table></div>
   <div class="legend mt">
     <div><b class="c-good">前 4 名</b>（绿底）晋级季后赛（双败淘汰，BO7）。</div>
@@ -668,15 +680,15 @@ function renderMarket() {
   };
   const loanBlock = `<div class="section-title" style="margin-top:18px">赛中租借（${open ? "窗口开放中，可直接签约" : "转会窗关闭后可用"}）</div>
     <div class="muted mb" style="font-size:12.5px">租借费 = 身价 <b>25%</b>，<b>3 轮后自动返回</b>原队。每赛季限 <b>${S.maxLoans || 1}</b> 次（剩余 <b>${loanLeft}</b> 次）。${(S.loans || []).length ? `<br>租借中：${S.loans.map(l => `${POS_NAME[l.pos]}【${escapeHtml(l.name)}】剩余 ${l.roundsLeft} 轮`).join("、")}` : ""}</div>
-    <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr))">${loanCandidates().slice(0, 6).map(loanCard).join("") || '<div class="muted">暂无可租借的替补</div>'}</div>`;
+    <div class="grid market-grid">${loanCandidates().slice(0, 6).map(loanCard).join("") || '<div class="muted">暂无可租借的替补</div>'}</div>`;
   return `<div class="section-title">转会市场（赛季转会 ${S.transfersUsed} / ${S.maxTransfers}）</div>
   ${windowBar}
   <div class="muted mb" style="margin-top:8px">资金 <b style="color:var(--gold)">¥${t.money}万</b> · 声望越高池子越强（${prestigeTier(t.prestige)}）。买入入替补席，需到【阵容】提首发。
     <span class="pill" style="margin-left:8px">🔒 市场每赛季初自动刷新（赛季中不可刷新）</span></div>
   <div class="section-title" style="margin-top:6px">可签约</div>
-  <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr))">${cands || '<div class="muted">暂无候选</div>'}</div>
+  <div class="grid market-grid">${cands || '<div class="muted">暂无候选</div>'}</div>
   <div class="section-title" style="margin-top:18px">我的替补（可卖出）</div>
-  <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr))">${bench || '<div class="muted">暂无替补可卖</div>'}</div>
+  <div class="grid market-grid">${bench || '<div class="muted">暂无替补可卖</div>'}</div>
   ${loanBlock}
   <div class="section-title" style="margin-top:18px">其他战队转会动态（本赛季）</div>
   ${aiFeed || '<div class="muted">其他战队本赛季暂无转会</div>'}`;
@@ -1030,11 +1042,11 @@ function renderSeries() {
         const lbl = enemySame ? matchupLabel(ph, heroByName(enemySame.hero)) : "";
         heroHtml = `<span class="muted">放置【${escapeHtml(pending)}】</span> <b class="${fitClass(fit)}" style="font-size:11px">${fitLabel(fit)}</b>${lbl ? ` <b class="${lbl === '克制' ? 'c-good' : lbl === '被克' ? 'c-bad' : 'c-mid'}" style="font-size:11px">${lbl}</b>` : ""}`;
       }
-      else heroHtml = `<span class="muted">拖拽英雄到此 / 或先点英雄</span>`;
+      else heroHtml = `<span class="muted">${isTouchDevice() ? "点这里放置已选英雄" : "拖拽英雄到此 / 或先点英雄"}</span>`;
       return `<div class="draft-row slot ${e ? 'filled' : ''} ${pending && !e ? 'hint' : ''}${sw}" data-slot="${pos}" data-act="placeslot:${pos}"><span class="pname">${POS_NAME[pos]}</span><span class="phero">${heroHtml}</span></div>`;
     }).join("");
     return `<div class="draft-side me">
-      <div class="draft-head">我方 · ${sideName(mySide)}（拖拽英雄到分路）${peak ? " · 巅峰对决" : ""}</div>
+      <div class="draft-head">我方 · ${sideName(mySide)}（${isTouchDevice() ? "点英雄 → 再点分路" : "拖拽英雄到分路"}）${peak ? " · 巅峰对决" : ""}</div>
       <div class="draft-bans">禁：${peak ? '<i class="muted">无（巅峰对决）</i>' : (d.bans[mySide].length ? d.bans[mySide].map(b => escapeHtml(b)).join("、") : '<i class="muted">—</i>')}</div>
       ${rows}</div>`;
   }
@@ -1085,9 +1097,9 @@ function renderSeries() {
       const star = mine ? `★${mst}` : "";
       const sel = pending === h.name ? "sel" : "";
       const otag = oppPrev.includes(h.name) ? `<em class="otag" title="对手战队用过，本队仍可选用">敌用</em>` : "";
-      return `<button class="hero-chip ${sel}" draggable="true" data-hero="${h.name}" data-lane="${h.pos}" data-mine="${mine ? 1 : 0}" data-oppused="${oppPrev.includes(h.name) ? 1 : 0}" data-act="pickhero:${h.name}" aria-label="选择 ${h.name}，${POS_NAME[h.pos]}，${ARC_NAME[h.arc]}${mine ? "，本队选手擅长" : ""}${oppPrev.includes(h.name) ? "，对手用过但本队仍可选" : ""}">${h.name}${star}${otag}<i class="muted" style="font-size:10px"> ${ARC_NAME[h.arc]}</i></button>`;
+      return `<button class="hero-chip ${sel}" ${isTouchDevice() ? "" : "draggable=\"true\""} data-hero="${h.name}" data-lane="${h.pos}" data-mine="${mine ? 1 : 0}" data-oppused="${oppPrev.includes(h.name) ? 1 : 0}" data-act="pickhero:${h.name}" aria-label="选择 ${h.name}，${POS_NAME[h.pos]}，${ARC_NAME[h.arc]}${mine ? "，本队选手擅长" : ""}${oppPrev.includes(h.name) ? "，对手用过但本队仍可选" : ""}">${h.name}${star}${otag}<i class="muted" style="font-size:10px"> ${ARC_NAME[h.arc]}</i></button>`;
     }).join("");
-    action = `<div class="section-title mt">选将台（点英雄或直接拖拽到左侧分路）${sideTag}</div>
+    action = `<div class="section-title mt">选将台（${isTouchDevice() ? "先点英雄 → 再点上方分路" : "点英雄或直接拖拽到左侧分路"}）${sideTag}</div>
       ${pending ? renderPendingCard(pending) : ""}
       ${bpFilterBarHtml("bench")}
       <div class="bench" id="bench" data-scroll-id="bench">${benchHtml || '<div class="muted">已无可选英雄</div>'}</div>

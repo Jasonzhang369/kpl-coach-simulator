@@ -1,7 +1,7 @@
 /* node tests/run.js [套件名片段] */
 const H = require("./harness");
 
-const suites = ["core", "save", "stamina", "age", "econ", "systems"];
+const suites = ["core", "save", "stamina", "age", "econ", "systems", "mobile"];
 
 const only = process.argv[2];
 let ran = 0;

@@ -2,3 +2,8 @@
 node_modules/
 .workbuddy/
 *.log
+
+# 截图工具生成的临时页（tests/shot.js 等）
+_shot.html
+_audit.html
+_mobile.html

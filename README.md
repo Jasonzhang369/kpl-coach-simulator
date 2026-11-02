@@ -110,12 +110,28 @@ git add -A && git commit -m "你的改动" && git push
 自带无头测试（最小 DOM/localStorage 桩，直接加载 `js/*.js`），不需要装任何东西：
 
 ```bash
-node tests/run.js           # 全部套件（189 项）
+node tests/run.js           # 全部套件（215 项）
 node tests/run.js econ      # 单个套件
 node tests/audio-check.js   # 音频链路（假 AudioContext，约 1.5 秒）
 ```
 
-当前 **189 项断言**，覆盖存档迁移、系列赛状态机、体能、年龄衰退、经济、BP 难度梯度、平衡回归、音频降级与设置/指南界面等。
+当前 **215 项断言**，覆盖存档迁移、系列赛状态机、体能、年龄衰退、经济、BP 难度梯度、平衡回归、音频降级、设置/指南界面与移动端适配等。
+
+### 移动端适配
+
+- **底部固定页签条**：≤760px 时 8 个页签移到底部（每格 ≥44px，手指友好），顶部只留战队名 / 状态 / 图标按钮。
+- **触屏 BP**：HTML5 拖拽在手机上不可用，自动切换成「点英雄 → 点分路」两步操作，提示文案也随之变化。
+- **表格横滑**：积分榜保留全部列并横向滚动，配「← 左右滑动查看完整榜单 →」提示。
+- 弹窗可滚动、战斗操作条叠在页签条之上、`env(safe-area-inset-bottom)` 适配刘海屏。
+
+想验证布局，用内置的无头浏览器工具（需要本机装了 Microsoft Edge）：
+
+```bash
+node tests/mobile-shot.js shot team,draft,battle 390 844 /tmp   # 按手机视口截图
+node tests/mobile-shot.js audit team,standings 390 844          # 审计溢出元素与小点击目标
+```
+
+它用 CDP 做**真机模拟**（`Emulation.setDeviceMetricsOverride` + 触摸模拟），会报告哪些元素撑破视口、哪些可点元素小于 28px。
 
 ---
 
@@ -123,14 +139,14 @@ node tests/audio-check.js   # 音频链路（假 AudioContext，约 1.5 秒）
 
 ```
 index.html              入口（5 个 script 按序加载）
-style.css               全部样式
+style.css               全部样式（含 ≤760px / ≤420px 移动端断点）
 js/data.js              静态数据：英雄 / 组合 / 战队 / 真实选手池 / 克制表
 js/audio.js             程序合成 BGM 与音效（Web Audio，无音频文件）
 js/sim.js               规则与模拟：战力 / BP AI / 系列赛 / 经济 / 年龄 / 双败
 js/render.js            渲染：页面 / 卡片 / BP 看板 / 战报 / 弹窗
 js/state.js             状态与交互：存档 / 动作 / 键鼠事件 / 启动
 audio/README.md         自定义巅峰对决 BGM 的放置说明
-tests/                  无头测试（node tests/run.js）
+tests/                  无头测试 + 无头截图/布局审计工具
 .github/workflows/      推 main 自动部署 Pages
 ```
 

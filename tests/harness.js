@@ -80,6 +80,7 @@ globalThis.__T = {
   AUTO_BP, BASE_MASTERY, LANE_PICK_FLOOR, wearTeamStamina,
   audioPref, saveAudioPref, audioSupported, sfx, playBgm, stopBgm, updateBgm, unlockAudio,
   TRACKS, AUDIO_DEFAULTS, AUDIO_PREF_KEY, guideSeen, markGuideSeen, openSettings, openGuide, goTitle, bgmTrackFor,
+  isTouchDevice,
   autoBpStepSafe: 0
 };
 `;
@@ -93,7 +94,9 @@ globalThis.__T = {
   vm.createContext(ctx);
   vm.runInContext(src + hook, ctx);
   const T = ctx.__T;
-  return { T, els, store, localStorage, document, src, root: () => els["game-root"].innerHTML };
+  const css = fs.readFileSync(path.join(ROOT, "style.css"), "utf8");
+  const html = fs.readFileSync(path.join(ROOT, "index.html"), "utf8");
+  return { T, els, store, localStorage, document, src, css, html, root: () => els["game-root"].innerHTML };
 }
 
 /* ---------- 断言与套件 ---------- */

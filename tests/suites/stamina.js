@@ -33,10 +33,15 @@ module.exports = function (env, H) {
   suite("轮换与体能标签", () => {
     H.newGame(env, { difficulty: "职业" });
     const t = T.getMyTeam();
-    T.POS.forEach(p => { t.players[p][0].st = 40; });
+    // 把低体能打到「现任首发」身上，保证一定触发轮换建议与撤销快照
+    // （原来打在 players[p][0] 上，而首发未必是第 0 个 → 偶发拿不到 undo）
+    T.POS.forEach(p => {
+      const cur = t.players[p].find(x => x.id === t.lineup[p]);
+      if (cur) cur.st = 40;
+    });
     const sug = T.rotationSuggest(t);
-    ok("低体能触发轮换建议", sug.length >= 0, sug.length);
-    const before = T.POS.map(p => t.players[p][0].st);
+    ok("低体能触发轮换建议", sug.length > 0, sug.length);
+    const before = T.POS.map(p => t.players[p].find(x => x.id === t.lineup[p]).st);
     T.applyRotation(true);
     const after = T.POS.map(p => t.players[p].find(x => x.id === t.lineup[p]).st);
     ok("轮换后首发体能不下降", after.every((v, i) => v >= before[i]), JSON.stringify(after));
