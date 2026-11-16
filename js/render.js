@@ -146,12 +146,23 @@ function confirmDialog(opt) {
 function renderTitle() {
   const slots = [];
   for (let i = 1; i <= SLOT_COUNT; i++) {
-    const m = slotMeta(i);
-    if (!m) {
+    const st = slotStatus(i);
+    const m = st === "ok" ? slotMeta(i) : null;
+    if (st === "empty" || (st === "ok" && !m)) {
       slots.push(`<div class="slot empty" aria-label="存档位 ${i}，当前为空">
         <div class="slot-h"><b>存档 ${i}</b><span class="muted">空</span></div>
         <div class="slot-body muted">还没有存档</div>
         <div class="hero-opt"><button class="btn gold sm" data-act="newgame:${i}" aria-label="在存档位 ${i} 开始新赛季">开始新赛季</button></div>
+      </div>`);
+    } else if (st === "broken") {
+      slots.push(`<div class="slot broken" aria-label="存档位 ${i} 数据异常，无法载入">
+        <div class="slot-h"><b>存档 ${i}</b><span style="color:var(--red2)">⚠ 数据异常</span></div>
+        <div class="slot-body">这个槽位里有数据，但<b>解析不出来</b>（常见原因：写入被中断、浏览器清理过一半、或者导入了错误的文件）。<br><span class="muted">原始数据还在，建议先导出留档，再反馈。</span></div>
+        <div class="hero-opt">
+          <button class="btn ghost sm" data-act="exportslot:${i}" aria-label="导出存档 ${i} 的原始数据">导出原始数据</button>
+          <button class="btn ghost sm" data-act="delslot:${i}" aria-label="删除存档 ${i}">删除</button>
+          <button class="btn ghost sm" data-act="newgame:${i}" aria-label="覆盖存档 ${i} 并开始新赛季">覆盖重开</button>
+        </div>
       </div>`);
     } else {
       const d = m.savedAt ? new Date(m.savedAt) : null;
@@ -181,7 +192,7 @@ function renderTitle() {
       <button class="btn ghost" data-act="showhelp" aria-label="查看快捷键与帮助">快捷键 / 帮助</button>
     </div>
     <input type="file" id="import-file" accept="application/json,.json" class="hidden" aria-hidden="true" />
-    <div class="tip" style="opacity:.6">进度自动保存在所选存档位（本地浏览器）。可导出 .json 备份，或导入到任意槽位。</div>
+    <div class="tip" style="opacity:.6">进度自动存在<b>当前浏览器 + 当前网址</b>下：换浏览器、换设备、换访问地址（比如从 GitHub 链接 vs 本地文件）、清理浏览器数据，都会看不到原来的存档。想换设备或长期保存，请用「导出」存成 .json，到新设备用「导入存档文件」读回。</div>
   </div>`;
   const fi = document.getElementById("import-file");
   if (fi) fi.addEventListener("change", () => {

@@ -63,7 +63,8 @@ function makeEnv() {
 globalThis.__T = {
   getS: () => (typeof S !== "undefined" ? S : null),
   setS: v => { S = v; },
-  newGame, save, load, slotKey, slotMeta, renameSlot, deleteSlot, exportSave,
+  newGame, save, load, slotKey, slotMeta, renameSlot, deleteSlot, exportSave, exportRawSlot, slotStatus,
+  normalizeSavePage, downloadText, importSaveText,
   render, renderTitle, renderMain, renderSeries,
   handleAct, startSeries, startMatch, newGameDraft, autoBpStep, autoBp, autoBpAllowed,
   battleTick, finishBattle, simGame, commitGame, seriesContinue, newSeason, advanceRegular,

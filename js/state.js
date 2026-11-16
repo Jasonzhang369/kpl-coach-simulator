@@ -918,14 +918,27 @@ function save() {
   if (!S) return;
   S.savedAt = Date.now(); S.version = SAVE_VERSION;
   S.slot = clamp(S.slot || 1, 1, SLOT_COUNT);
-  const keepUndo = S.undo;
+  const keepUndo = S.undo, keepPage = S.page;
   S.undo = null;                       // 撤销快照只存在内存里，避免存档体积翻倍
+  // 「标题页」只是界面状态、不是进度：绝不能写进存档，否则下次读档会原地打转
+  if (S.page === "title") S.page = "main";
   try {
     localStorage.setItem(slotKey(S.slot), JSON.stringify(S));
     localStorage.setItem(LAST_SLOT_KEY, String(S.slot));
-  } catch (e) {} finally { S.undo = keepUndo; }
+  } catch (e) {} finally { S.undo = keepUndo; S.page = keepPage; }
 }
 function hasAnySave() { for (let i = 1; i <= SLOT_COUNT; i++) if (localStorage.getItem(slotKey(i))) return true; return false; }
+/* 槽位状态：empty 空 / ok 可读 / broken 有数据但解析不出来（旧版残留、写入被中断、手改坏了）
+   区分 broken 与 empty 很重要——否则坏档在标题页显示成「空」，玩家一点「开始新赛季」就把它覆盖了。 */
+function slotStatus(n) {
+  let raw = null;
+  try { raw = localStorage.getItem(slotKey(n)); } catch (e) { return "empty"; }
+  if (!raw) return "empty";
+  try {
+    const o = JSON.parse(raw);
+    return (o && o.myTeamId && Array.isArray(o.teams) && o.teams.length) ? "ok" : "broken";
+  } catch (e) { return "broken"; }
+}
 // 重命名存档：空名字 = 恢复显示战队名
 function renameSlot(n, name) {
   const nm = String(name == null ? "" : name).trim().slice(0, 24);
@@ -959,20 +972,35 @@ function migrateLegacySave() {
     localStorage.removeItem(LEGACY_SAVE_KEY);
   } catch (e) {}
 }
+/* 触发一次本地文件下载（导出存档 / 导出坏档都用它） */
+function downloadText(filename, text) {
+  const blob = new Blob([text], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
 function exportSave(n) {
   const raw = localStorage.getItem(slotKey(n));
   if (!raw) { toast("该存档位为空"); return; }
+  if (slotStatus(n) === "broken") { exportRawSlot(n); return; }   // 坏档也要能导出留底
   try {
     const meta = slotMeta(n) || {};
-    const blob = new Blob([raw], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
     const nm = String(meta.name || meta.team || "save").replace(/[\\/:*?"<>|]/g, "_");
-    a.download = `KPL教练_${nm}_S${meta.season || 1}.json`;
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1500);
+    downloadText(`KPL教练_${nm}_S${meta.season || 1}.json`, raw);
     toast("已导出存档文件");
+  } catch (e) { toast("导出失败"); }
+}
+/* 原样导出槽位里的字符串（坏了也要能留个底，方便反馈/手工抢救） */
+function exportRawSlot(n) {
+  let raw = null;
+  try { raw = localStorage.getItem(slotKey(n)); } catch (e) {}
+  if (!raw) { toast("该存档位为空"); return; }
+  try {
+    downloadText(`KPL教练_存档${n}_原始数据.json`, raw);
+    toast("已导出原始数据（即使无法载入也值得留一份）");
   } catch (e) { toast("导出失败"); }
 }
 function importSaveText(text, preferSlot) {
@@ -984,22 +1012,69 @@ function importSaveText(text, preferSlot) {
   if (!slot) slot = 1;
   o.slot = slot; o.savedAt = o.savedAt || Date.now();
   try { localStorage.setItem(slotKey(slot), JSON.stringify(o)); } catch (e) { toast("写入存档失败"); return false; }
-  load(slot);
+  if (load(slot) === false) return false;
   toast(`已导入到存档 ${slot}`);
   return true;
 }
+/* 读档时把「页面」归一到真能渲染的状态。
+   这是一个真实事故：旧版点「返回首页」会把 page="title" 一起写进存档，于是下次点「载入」
+   → 读回来 page 还是 "title" → 又渲染标题页 → 玩家看到「存档明明在那儿，点载入完全没反应」。
+   现在：标题页不算进度，一律回主界面；残局子状态缺失就丢弃这一场，回主界面重打这一轮。 */
+function normalizeSavePage(s) {
+  if (!s) return "main";
+  const ser = s.series;
+  if (s.page === "series" && ser) {
+    const sub = ser.sub;
+    const okSub = sub === "draft" ? !!ser.draft
+      : (sub === "preview" || sub === "battle") ? !!ser.battle
+        : (sub === "result" || sub === "sub" || sub === "over") ? Array.isArray(ser.games)
+          : false;
+    if (okSub) return "series";
+    s.series = null;
+  }
+  return "main";
+}
+/* 读档失败要说清楚原因，并且绝不能先把原始数据丢掉 */
+function loadFailed(slot, why, raw) {
+  S = null;
+  render();
+  toast("存档读取失败");
+  confirmDialog({
+    title: `存档 ${slot} 无法载入`,
+    body: `${escapeHtml(why)}<br><br>原始数据还在这台设备的浏览器里，<b style="color:var(--red2)">先别删这个槽位</b>。建议点下面「导出原始数据」留一份（可发给作者排查），确认能救回来之前不要覆盖它。`,
+    okText: "导出原始数据",
+    cancelText: "关闭"
+  }).then(ok => { if (ok) exportRawSlot(slot); });
+  return false;
+}
 function load(n) {
   let slot = n;
-  if (!slot) slot = parseInt(localStorage.getItem(LAST_SLOT_KEY) || "0", 10) || 0;
-  if (!slot) { for (let i = 1; i <= SLOT_COUNT; i++) if (localStorage.getItem(slotKey(i))) { slot = i; break; } }
-  if (!slot) slot = 1;
   try {
-    const raw = localStorage.getItem(slotKey(slot));
-    if (!raw) { toast("该存档位为空"); S = { page: "title" }; render(); return; }
-    S = migrateSaveData(JSON.parse(raw));
+    if (!slot) slot = parseInt(localStorage.getItem(LAST_SLOT_KEY) || "0", 10) || 0;
+    if (!slot) { for (let i = 1; i <= SLOT_COUNT; i++) if (localStorage.getItem(slotKey(i))) { slot = i; break; } }
+  } catch (e) { toast("浏览器禁止读取本地存储（无痕模式？）"); return false; }
+  if (!slot) slot = 1;
+
+  let raw = null;
+  try { raw = localStorage.getItem(slotKey(slot)); }
+  catch (e) { toast("浏览器禁止读取本地存储（无痕模式？）"); return false; }
+  if (!raw) { toast("该存档位为空"); S = { page: "title" }; render(); return false; }
+
+  let data = null;
+  try { data = JSON.parse(raw); } catch (e) { return loadFailed(slot, "存档内容已损坏（JSON 解析失败），常见原因是浏览器写入被中断、或文件被手工改过。", raw); }
+  if (!data || !data.myTeamId || !Array.isArray(data.teams) || !data.teams.length) {
+    return loadFailed(slot, "存档内容不完整（缺少战队数据），可能是别的游戏/别的版本的文件被导入到了这里。", raw);
+  }
+  if ((data.version || 0) > SAVE_VERSION) {
+    return loadFailed(slot, `这个存档来自更新的版本（存档版本 ${data.version}，当前游戏只支持到 ${SAVE_VERSION}）。请用最新版网页打开（刷新一下即可）。`, raw);
+  }
+
+  // 第一段：数据升级 + 字段补齐。出错 = 数据问题，明确告知而不是静默失败
+  try {
+    S = migrateSaveData(data);
     S.slot = slot;
     S._autoRun = false; S._autoTimer = null; // 读档时不会残留自动BP 计时器
-    if (!S.page) S.page = "main";
+    S.page = normalizeSavePage(S);
     if (!S.tab) S.tab = "team";
     if (S.season == null) S.season = 1;
     if (!S.history) S.history = [];
@@ -1044,7 +1119,7 @@ function load(n) {
       }));
     });
     // 旧存档迁移：全局BP由「红蓝方」改为「战队」记录
-    if (S.series) {
+    if (S.series && S.series.sub) {
       if (!S.series.usedByTeam) {
         S.series.usedByTeam = {};
         if (Array.isArray(S.series.myUsedHeroes)) S.series.usedByTeam[S.myTeamId] = S.series.myUsedHeroes.slice();
@@ -1055,13 +1130,36 @@ function load(n) {
       if (!S.series.usedByTeam[S.series.oppId]) S.series.usedByTeam[S.series.oppId] = [];
       if (S.series.gameIndex == null) S.series.gameIndex = (S.series.games || []).length;
     }
-    // 读档时若停在虚拟战斗中，直接结算，避免卡住
-    if (S.series && S.series.sub === "battle" && S.series.battle) { finishBattle(); return; }
+    S.page = normalizeSavePage(S);
+  } catch (e) {
+    return loadFailed(slot, "存档数据升级失败：" + (e && e.message ? e.message : String(e)), raw);
+  }
+
+  // 第二段：渲染。数据已经在内存里了，界面出错要给出路，而不是停在首页装作没点
+  try {
+    // 读档时若停在虚拟战斗中，直接结算，避免卡住（commitGame 内部会 save + render）
+    if (S.page === "series" && S.series.sub === "battle") { finishBattle(); return true; }
     // 声望已归零的存档直接进失败页
     const me = getMyTeam();
     if (!S.gameOver && me && me.prestige <= 0) triggerGameOver("声望归零");
     render();
-  } catch (e) { toast("存档读取失败"); }
+  } catch (e) {
+    // 兜底：丢掉可能坏掉的子界面，退回主界面再试一次
+    try {
+      S.page = "main"; S.series = null; S.event = null;
+      render();
+      toast("原页面状态无法恢复，已退回主界面（进度已保留）");
+    } catch (e2) {
+      S = null; render();
+      confirmDialog({
+        title: `存档 ${slot} 读入了，但界面崩了`,
+        body: `数据已经读进内存，但渲染出错：<b>${escapeHtml(e && e.message ? e.message : String(e))}</b><br><br>请先导出原始数据备份并反馈这个问题。`,
+        okText: "导出原始数据", cancelText: "关闭"
+      }).then(ok => { if (ok) exportRawSlot(slot); });
+      return false;
+    }
+  }
+  return true;
 }
 
 /* ---------------- 启动 ---------------- */

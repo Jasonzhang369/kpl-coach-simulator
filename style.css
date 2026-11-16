@@ -255,6 +255,7 @@ details.season-block>summary{font-size:13px}
 @media(max-width:760px){.slot-list{grid-template-columns:1fr}}
 .slot{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;text-align:left;box-shadow:var(--shadow)}
 .slot.empty{opacity:.75;border-style:dashed}
+.slot.broken{border-style:dashed;border-color:rgba(255,59,48,.55);background:rgba(255,59,48,.06)}
 .slot .slot-h{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--txt2);margin-bottom:6px}
 .slot .slot-body{font-size:13.5px;margin-bottom:4px;line-height:1.5}
 .slot .hero-opt{margin-top:8px;display:flex;flex-wrap:wrap;gap:6px}
