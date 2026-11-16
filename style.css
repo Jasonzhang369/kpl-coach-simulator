@@ -13,6 +13,7 @@
   --txt:#e8ecf6;
   --txt2:#9aa6c4;
   --shadow:0 8px 30px rgba(0,0,0,.45);
+  --z:1; /* 宽屏整体放大倍数，见文件末尾 */
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
@@ -30,7 +31,7 @@ button{font-family:inherit;cursor:pointer;border:none;outline:none}
 .hidden{display:none !important}
 
 /* ---------- 通用布局 ---------- */
-#game-root{max-width:1080px;margin:0 auto;padding:14px 16px 60px;min-height:100vh}
+#game-root{max-width:1080px;margin:0 auto;padding:14px 16px 60px;min-height:calc(100vh / var(--z))}
 .topbar{
   display:flex;align-items:center;gap:14px;flex-wrap:wrap;
   background:linear-gradient(90deg,var(--panel),var(--panel2));
@@ -133,7 +134,7 @@ tr.you td{color:var(--gold);font-weight:700}
 .modal .opts{display:flex;flex-direction:column;gap:10px}
 
 /* ---------- 标题界面 ---------- */
-.title-screen{height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:18px}
+.title-screen{height:calc(100vh / var(--z));display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:18px}
 .title-screen .logo{font-size:54px;font-weight:900;letter-spacing:2px;background:linear-gradient(135deg,var(--gold),var(--red));-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:0 0 40px rgba(255,59,48,.25)}
 .title-screen .sub{color:var(--txt2);font-size:15px;letter-spacing:4px}
 .title-screen .tip{color:var(--txt2);font-size:12px;max-width:440px;line-height:1.7}
@@ -266,12 +267,12 @@ details.season-block>summary{font-size:13px}
   display:flex;align-items:center;gap:10px;
   background:var(--panel2);border:1px solid var(--gold);border-radius:12px;
   padding:8px 12px;font-size:12.5px;color:var(--txt);box-shadow:var(--shadow);
-  animation:pop .18s ease;max-width:calc(100vw - 32px);
+  animation:pop .18s ease;max-width:calc(100vw / var(--z) - 32px);
 }
 .undo-bar b{color:var(--gold)}
 
 /* ---------- 战斗页：固定底部操作条 + 内部滚动播报 ---------- */
-.battle-feed{max-height:46vh;overflow:auto;padding-right:4px}
+.battle-feed{max-height:calc(46vh / var(--z));overflow:auto;padding-right:4px}
 .action-spacer{height:84px}
 .action-bar{
   position:fixed;left:0;right:0;bottom:0;z-index:65;
@@ -339,7 +340,7 @@ button:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
 .kpi-row{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;font-size:13px;margin-top:4px}
 
 /* ---------- 英雄熟练度弹窗 ---------- */
-.hero-train-list{max-height:52vh;overflow:auto;padding-right:4px;margin-top:4px}
+.hero-train-list{max-height:calc(52vh / var(--z));overflow:auto;padding-right:4px;margin-top:4px}
 .hero-train-row{display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
 .hero-train-row .ht-body{flex:1;min-width:0}
 .hero-train-row .btn{flex:0 0 auto;line-height:1.3;text-align:center}
@@ -358,7 +359,7 @@ button:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
 .settings-modal code{background:var(--bg2);border:1px solid var(--line);border-radius:5px;padding:1px 5px;font-size:12px;color:var(--gold)}
 
 /* ---------- 游玩指南 ---------- */
-.guide-modal{max-width:600px;max-height:86vh;overflow:auto}
+.guide-modal{max-width:600px;max-height:calc(86vh / var(--z));overflow:auto}
 .guide-steps{display:flex;flex-direction:column;gap:9px;margin:6px 0 4px}
 .guide-step{display:flex;gap:10px;align-items:flex-start;background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:9px 11px}
 .guide-step .gs-n{flex:0 0 22px;height:22px;border-radius:50%;background:rgba(245,197,24,.15);border:1px solid rgba(245,197,24,.5);color:var(--gold);font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;margin-top:1px}
@@ -540,3 +541,13 @@ button:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
   .player-card .pos{position:static;display:inline-block;margin-right:6px}
 }
 
+/* 宽屏：整体等比放大，填满大屏；vh/vw 已按 --z 回除，避免放大后溢出。手机（≤760px）不受影响 */
+/* 每档都满足 1112px(内容+内边距) * z < 断点宽度，不会出现横向滚动 */
+@media (min-width:1280px){:root{--z:1.1}}
+@media (min-width:1366px){:root{--z:1.2}}
+@media (min-width:1536px){:root{--z:1.3}}
+@media (min-width:1680px){:root{--z:1.4}}
+@media (min-width:1900px){:root{--z:1.55}}
+@media (min-width:2400px){:root{--z:1.85}}
+html{zoom:var(--z)}
+@media (min-width:761px){.modal{max-height:calc(100vh / var(--z) - 36px);overflow:auto}} /* 放大后矮屏弹窗可滚动；手机沿用上面的 88vh */
