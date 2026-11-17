@@ -910,8 +910,9 @@ function myAutoPick() {
     (laneOk.length ? laneOk : pool).forEach(h => {
       const prof = profOf(starter, h.name);
       const fit = laneFit(h, pos);
-      const counter = enemyHero ? matchupMult(h, enemyHero) : 1;
-      let sc = heroStrength(h);
+      const hL = heroInPos(h, pos);              // 元流之子：按本路形态算战力与克制
+      const counter = enemyHero ? matchupMult(hL, heroInPos(enemyHero, pos)) : 1;
+      let sc = heroStrength(hL);
       sc *= 1 + (prof - 1) * AUTO_BP.profW;
       sc *= 1 - (1 - fit) * AUTO_BP.fitW;
       sc *= 1 + (counter - 1) * AUTO_BP.counterW;
@@ -1080,7 +1081,7 @@ function renderSeries() {
       const star = mine ? `★${mst}` : "";
       const sel = pending === h.name ? "sel" : "";
       const tag = prevUsed.includes(h.name) ? `<em class="peak-tag" title="本系列赛用过，巅峰对决仍可选">曾用</em>` : "";
-      return `<button class="hero-chip ${sel}" draggable="true" data-hero="${h.name}" data-lane="${h.pos}" data-mine="${mine ? 1 : 0}" data-act="pickhero:${h.name}" aria-label="选择 ${h.name}，${POS_NAME[h.pos]}，${ARC_NAME[h.arc]}${mine ? "，本队选手擅长" : ""}">${h.name}${star}${tag}<i class="muted" style="font-size:10px"> ${ARC_NAME[h.arc]}</i></button>`;
+      return `<button class="hero-chip ${sel}" draggable="true" data-hero="${h.name}" data-lane="${h.pos}" data-mine="${mine ? 1 : 0}" data-act="pickhero:${h.name}" aria-label="选择 ${h.name}，${POS_NAME[h.pos]}，${ARC_NAME[h.arc]}${mine ? "，本队选手擅长" : ""}">${h.name}${star}${tag}<i class="muted" style="font-size:10px"> ${heroHasForms(h) ? "五形态" : ARC_NAME[h.arc]}</i></button>`;
     }).join("");
     action = `<div class="section-title mt">⚡ 巅峰对决 · 我方盲选（${d.picks[mySide].length}/5）</div>
       <div class="warn mb peak-note">本局 <b>没有 ban 位</b>、<b>不受全局BP限制</b>：此前用过的英雄仍可选（标 <em class="peak-tag">曾用</em>），双方也可能选到<b>同一个英雄</b>。选满 5 个后立即揭示对手阵容并开赛。</div>
@@ -1093,7 +1094,7 @@ function renderSeries() {
     const groups = POS.map(pos => {
       const hs = pool.filter(h => h.pos === pos); if (!hs.length) return "";
       return `<div class="mb" data-lane-group="${pos}"><div class="muted" style="font-size:12px;margin-bottom:4px">${POS_NAME[pos]}</div>
-        <div class="hero-opt">${hs.map(h => `<button class="ban-btn" data-act="ban:${h.name}" data-hero="${h.name}" data-lane="${h.pos}" data-mine="${heroInMyPool(h.name) ? 1 : 0}" aria-label="禁用 ${h.name}，${POS_NAME[h.pos]}，${ARC_NAME[h.arc]}">${h.name}<i class="muted" style="font-size:10px"> ${ARC_NAME[h.arc]}</i></button>`).join("")}</div></div>`;
+        <div class="hero-opt">${hs.map(h => `<button class="ban-btn" data-act="ban:${h.name}" data-hero="${h.name}" data-lane="${h.pos}" data-mine="${heroInMyPool(h.name) ? 1 : 0}" aria-label="禁用 ${h.name}，${POS_NAME[h.pos]}，${heroHasForms(h) ? "五形态" : ARC_NAME[h.arc]}">${h.name}<i class="muted" style="font-size:10px"> ${heroHasForms(h) ? "五形态" : ARC_NAME[h.arc]}</i></button>`).join("")}</div></div>`;
     }).join("");
     const intel = threat.length ? `<div class="intel mb">
       <div class="intel-h">🎯 对手擅长（按其首发选手英雄池与战力排序，建议优先 ban，数据分析师等级越高情报越多）</div>
@@ -1115,7 +1116,7 @@ function renderSeries() {
       const star = mine ? `★${mst}` : "";
       const sel = pending === h.name ? "sel" : "";
       const otag = oppPrev.includes(h.name) ? `<em class="otag" title="对手战队用过，本队仍可选用">敌用</em>` : "";
-      return `<button class="hero-chip ${sel}" ${isTouchDevice() ? "" : "draggable=\"true\""} data-hero="${h.name}" data-lane="${h.pos}" data-mine="${mine ? 1 : 0}" data-oppused="${oppPrev.includes(h.name) ? 1 : 0}" data-act="pickhero:${h.name}" aria-label="选择 ${h.name}，${POS_NAME[h.pos]}，${ARC_NAME[h.arc]}${mine ? "，本队选手擅长" : ""}${oppPrev.includes(h.name) ? "，对手用过但本队仍可选" : ""}">${h.name}${star}${otag}<i class="muted" style="font-size:10px"> ${ARC_NAME[h.arc]}</i></button>`;
+      return `<button class="hero-chip ${sel}" ${isTouchDevice() ? "" : "draggable=\"true\""} data-hero="${h.name}" data-lane="${h.pos}" data-mine="${mine ? 1 : 0}" data-oppused="${oppPrev.includes(h.name) ? 1 : 0}" data-act="pickhero:${h.name}" aria-label="选择 ${h.name}，${POS_NAME[h.pos]}，${ARC_NAME[h.arc]}${mine ? "，本队选手擅长" : ""}${oppPrev.includes(h.name) ? "，对手用过但本队仍可选" : ""}">${h.name}${star}${otag}<i class="muted" style="font-size:10px"> ${heroHasForms(h) ? "五形态" : ARC_NAME[h.arc]}</i></button>`;
     }).join("");
     action = `<div class="section-title mt">选将台（${isTouchDevice() ? "先点英雄 → 再点上方分路" : "点英雄或直接拖拽到左侧分路"}）${sideTag}</div>
       ${pending ? renderPendingCard(pending) : ""}

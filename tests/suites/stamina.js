@@ -35,9 +35,13 @@ module.exports = function (env, H) {
     const t = T.getMyTeam();
     // 把低体能打到「现任首发」身上，保证一定触发轮换建议与撤销快照
     // （原来打在 players[p][0] 上，而首发未必是第 0 个 → 偶发拿不到 undo）
+    // 确定性写法：首发压到 40 体能，同时保证每个位置都有「体能 90、总评不低」的替补，
+    // 否则 rotationSuggest 的「替补总评不低于首发 -8」条件是随机结果，会偶发 0 条建议
     T.POS.forEach(p => {
       const cur = t.players[p].find(x => x.id === t.lineup[p]);
       if (cur) cur.st = 40;
+      const bench = t.players[p].find(x => x.id !== t.lineup[p]);
+      if (bench) { bench.st = 90; bench.status = "ok"; bench.statusRounds = 0; if (cur) bench.ovr = cur.ovr; }
     });
     const sug = T.rotationSuggest(t);
     ok("低体能触发轮换建议", sug.length > 0, sug.length);

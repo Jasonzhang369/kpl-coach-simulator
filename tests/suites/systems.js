@@ -405,7 +405,7 @@ module.exports = function (env, H) {
     const h = n => T.heroByName(n);
     const fit = (n, pos) => T.laneFit(T.heroByName(n), pos);
 
-    ok("英雄池 124 个（新增程咬金）", T.HEROES.length === 124, T.HEROES.length);
+    ok("英雄池 130 个（+程咬金、姬小满、亚连、大司命、心魔六耳、刀锋宝贝、元流之子）", T.HEROES.length === 130, T.HEROES.length);
     ok("程咬金：对抗路 / 坦克", h("程咬金").pos === "top" && h("程咬金").arc === "tank");
     ok("程咬金：打野逆用 0.82", Math.abs(fit("程咬金", "jungle") - 0.82) < 1e-9, fit("程咬金", "jungle"));
 
@@ -439,5 +439,54 @@ module.exports = function (env, H) {
       if (!pool.some(nm => jt.includes(nm))) miss++;
     }
     ok("200 次抽样打野池都含坦野", miss === 0, miss + " 次缺失");
+  });
+
+  /* 新增英雄 + 元流之子五形态（形态决定四维与定位，坦克形态才算前排） */
+  suite("新增英雄与元流之子五形态", () => {
+    const h = n => T.heroByName(n);
+    ok("姬小满：对抗路 / 战士", h("姬小满").pos === "top" && h("姬小满").arc === "fighter");
+    ok("亚连：对抗路 / 战士", h("亚连").pos === "top" && h("亚连").arc === "fighter");
+    ok("大司命：打野 / 战士，可摇对抗路 0.92",
+      h("大司命").pos === "jungle" && h("大司命").arc === "fighter" && Math.abs(T.laneFit(h("大司命"), "top") - 0.92) < 1e-9);
+    ok("心魔六耳：打野 / 刺客", h("心魔六耳").pos === "jungle" && h("心魔六耳").arc === "assassin");
+    ok("刀锋宝贝：打野 / 刺客（按玩家要求走打野）", h("刀锋宝贝").pos === "jungle" && h("刀锋宝贝").arc === "assassin");
+
+    const ud = h("元流之子");
+    ok("元流之子：五路都算主场", ["top", "jungle", "mid", "bot", "support"].every(p => T.laneFit(ud, p) === 1));
+    ok("元流之子：只有一份英雄条目", T.HEROES.filter(x => x.name === "元流之子").length === 1);
+    const expect = { mid: "mage", top: "tank", jungle: "assassin", bot: "marksman", support: "support" };
+    ok("五形态定位正确", Object.keys(expect).every(p => T.heroInPos(ud, p).arc === expect[p]),
+      Object.keys(expect).map(p => p + ":" + T.heroInPos(ud, p).arc).join(" "));
+    ok("形态四维确实不同",
+      T.heroInPos(ud, "top").s !== T.heroInPos(ud, "bot").s
+      && T.heroInPos(ud, "jungle").o !== T.heroInPos(ud, "support").o);
+    ok("非多形态英雄不受影响", T.heroInPos(h("吕布"), "mid") === h("吕布"));
+
+    // 阵容判定：元流之子走对抗路是坦克形态 → 算前排；吕布走对抗路不算
+    const mk = top => ({ top, jungle: "澜", mid: "小乔", bot: "孙尚香", support: "张飞" });
+    const c1 = T.evaluateComp(mk("元流之子"), "稳");
+    const c2 = T.evaluateComp(mk("吕布"), "稳");
+    ok("元流之子坦克形态算前排", c1.tips.indexOf("前排充足，团战能扛") >= 0, c1.tips.join("/"));
+    ok("换成战士则前排不足", c2.tips.indexOf("前排充足，团战能扛") < 0, c2.tips.join("/"));
+
+    // 战力：同一英雄不同分路形态，战力应有系统性差异（坦克形态生存高、法师形态输出高）
+    H.newGame(env, { difficulty: "职业" });
+    const me = T.getMyTeam();
+    const p = me.players.mid.find(x => x.id === me.lineup.mid) || me.players.mid[0];
+    const avg = (pos, n) => {
+      let s = 0;
+      for (let i = 0; i < n; i++) s += T.posPower(p, h("元流之子"), h("小乔"), "稳", pos, null);
+      return s / n;
+    };
+    const pTop = avg("top", 60), pMid = avg("mid", 60);
+    ok("元流之子：不同分路形态战力不同", Math.abs(pTop - pMid) > 0.5, `${pTop.toFixed(1)} vs ${pMid.toFixed(1)}`);
+
+    // 选将台要能看到它，并且标注「五形态」而不是「法师」
+    T.getS().transferWindow = false;
+    T.startSeries(T.getS().schedule.find(x => !x.played).oppId, 5, "regular", null, "测形态");
+    T.renderSeries();
+    const draftHtml = root();
+    ok("选将台能选到元流之子", draftHtml.indexOf("元流之子") >= 0);
+    ok("元流之子标注为五形态", /元流之子[\s\S]{0,120}五形态/.test(draftHtml));
   });
 };

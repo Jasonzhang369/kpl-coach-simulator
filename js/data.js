@@ -40,6 +40,8 @@ const HEROES = [
   { name: "影", pos: "top", arc: "fighter", o: 82, s: 72, c: 55, m: 76 },
   { name: "蚩奼", pos: "top", arc: "fighter", o: 82, s: 74, c: 62, m: 68 },
   { name: "程咬金", pos: "top", arc: "tank", o: 60, s: 92, c: 42, m: 70 },
+  { name: "姬小满", pos: "top", arc: "fighter", o: 80, s: 70, c: 60, m: 78 },
+  { name: "亚连", pos: "top", arc: "fighter", o: 76, s: 82, c: 55, m: 66 },
   // ===== 打野 =====
   { name: "澜", pos: "jungle", arc: "assassin", o: 86, s: 60, c: 45, m: 82 },
   { name: "镜", pos: "jungle", arc: "assassin", o: 88, s: 56, c: 40, m: 86 },
@@ -67,6 +69,9 @@ const HEROES = [
   { name: "杨戬", pos: "top", arc: "fighter", o: 80, s: 74, c: 55, m: 70 },
   { name: "梦奇", pos: "jungle", arc: "fighter", o: 76, s: 78, c: 55, m: 66 },
   { name: "阿古朵", pos: "jungle", arc: "tank", o: 60, s: 82, c: 70, m: 62 },
+  { name: "大司命", pos: "jungle", arc: "fighter", o: 80, s: 68, c: 60, m: 74 },
+  { name: "心魔六耳", pos: "jungle", arc: "assassin", o: 84, s: 62, c: 50, m: 82 },
+  { name: "刀锋宝贝", pos: "jungle", arc: "assassin", o: 84, s: 58, c: 48, m: 80 },
   // ===== 中路 =====
   { name: "不知火舞", pos: "mid", arc: "mage", o: 86, s: 52, c: 72, m: 78 },
   { name: "上官婉儿", pos: "mid", arc: "mage", o: 84, s: 50, c: 68, m: 82 },
@@ -138,7 +143,9 @@ const HEROES = [
   { name: "少司缘", pos: "support", arc: "support", o: 56, s: 70, c: 84, m: 74 },
   { name: "赵怀真", pos: "support", arc: "tank", o: 60, s: 80, c: 78, m: 66 },
   { name: "大禹", pos: "support", arc: "tank", o: 56, s: 88, c: 82, m: 58 },
-  { name: "空空儿", pos: "support", arc: "support", o: 54, s: 70, c: 86, m: 82 }
+  { name: "空空儿", pos: "support", arc: "support", o: 54, s: 70, c: 86, m: 82 },
+  // ===== 多形态英雄（本体按中路法师登记，实际形态见 HERO_FORMS）=====
+  { name: "元流之子", pos: "mid", arc: "mage", o: 82, s: 50, c: 62, m: 58 }
 ];
 
 // 英雄分路匹配度（摇摆位）：按各英雄摇摆到不同分路的常见程度分档（基于出场分路统计）。
@@ -153,6 +160,7 @@ const HERO_FLEX = {
   达摩: { jungle: 0.86, support: 0.80 }, 芈月: { jungle: 0.95 }, 项羽: { support: 0.93 },
   猪八戒: { jungle: 0.95, support: 0.88 }, 元歌: { jungle: 0.86, mid: 0.80 }, 杨戬: { jungle: 0.96 },
   影: { jungle: 0.96 }, 蚩奼: { jungle: 0.92, bot: 0.88 }, 程咬金: { jungle: 0.82 },
+  姬小满: { jungle: 0.82 }, 亚连: { jungle: 0.80 }, 大司命: { top: 0.92 }, 心魔六耳: { top: 0.88 },
   // 打野主的摇摆
   赵云: { top: 0.88, support: 0.84 }, 橘右京: { top: 0.90, support: 0.80 }, 兰陵王: { support: 0.84 },
   雅典娜: { top: 0.90, support: 0.80 }, 东方曜: { top: 0.96 }, 云缨: { top: 0.95 },
@@ -176,7 +184,7 @@ const HERO_FLEX = {
   鬼谷子: { mid: 0.86 }, 东皇太一: { top: 0.90, jungle: 0.80 }, 盾山: { top: 0.86 },
   刘禅: { top: 0.92 }, 太乙真人: { top: 0.82 }, 苏烈: { top: 0.93, jungle: 0.86 }, 钟馗: { mid: 0.88, top: 0.82, jungle: 0.80 },
   桑启: { mid: 0.85 }, 朵莉亚: { mid: 0.85 }, 少司缘: { mid: 0.85 }, 赵怀真: { top: 0.88, jungle: 0.90 },
-  大禹: { top: 0.94 }, 空空儿: { mid: 0.86 }
+  大禹: { top: 0.94 }, 空空儿: { mid: 0.86 }, 元流之子: { top: 1, jungle: 1, bot: 1, support: 1 }
 };
 function laneFit(hero, pos) {
   if (!hero) return 1;
@@ -211,7 +219,9 @@ const HERO_SKILL = {
   鬼谷子: "二技能拉人", 东皇太一: "大招压制", 蔡文姬: "持续治疗", 盾山: "一技能托举格挡", 明世隐: "链接增益",
   庄周: "大招解控", 刘禅: "大招拆塔", 鲁班大师: "拉人位移", 太乙真人: "大招复活", 苏烈: "大招蓄力击飞",
   钟馗: "二技能勾人", 桑启: "飞行治疗", 朵莉亚: "大招传送", 少司缘: "附身增益", 赵怀真: "一技能拉人",
-  大禹: "大招治水开团", 空空儿: "二技能抓人"
+  大禹: "大招治水开团", 空空儿: "二技能抓人",
+  姬小满: "风筝拉扯连续位移", 亚连: "护盾承伤接爆发", 大司命: "魂镰收割", 心魔六耳: "心魔分身双形态",
+  刀锋宝贝: "锋刃突进收割", 元流之子: "五形态切换（法师/坦克/射手/辅助/刺客）"
 };
 function heroSkill(name) { return HERO_SKILL[name] || "技能连招"; }
 /* 英雄特性：不体现在四维上，按机制单独结算。
@@ -233,6 +243,34 @@ function heroTraitNote(hero, oppHero) {
   const t = HERO_TRAITS[hero.name];
   return (t && t.antiCC && (oppHero.c || 0) >= ANTI_CC_THRESHOLD) ? t.desc : "";
 }
+/* 多形态英雄：同一个英雄在不同分路是不同形态，四维与定位都跟着变。
+   目前只有元流之子（法师 / 坦克 / 射手 / 辅助 / 刺客 五形态），对应游戏内"选形态"的设定。
+   注意：HEROES 里的元流之子只是本体（按中路法师登记），真正的数值以 HERO_FORMS 为准，
+   所有涉及 arc / 四维的计算都要先过 heroInPos(hero, pos)。 */
+const HERO_FORMS = {
+  元流之子: {
+    mid:     { arc: "mage",     o: 82, s: 50, c: 62, m: 58, label: "法师形态", lane: "中路" },
+    top:     { arc: "tank",     o: 58, s: 90, c: 72, m: 52, label: "坦克形态", lane: "对抗路" },
+    jungle:  { arc: "assassin", o: 86, s: 58, c: 45, m: 84, label: "刺客形态", lane: "打野" },
+    bot:     { arc: "marksman", o: 84, s: 48, c: 55, m: 62, label: "射手形态", lane: "发育路" },
+    support: { arc: "support",  o: 54, s: 76, c: 84, m: 62, label: "辅助形态", lane: "游走" }
+  }
+};
+function heroFormOf(hero, pos) {
+  const forms = hero && HERO_FORMS[hero.name];
+  return (forms && forms[pos]) || null;
+}
+/* 按分路取"形态后的英雄"：没有多形态的返回原对象（不产生额外开销） */
+function heroInPos(hero, pos) {
+  const f = heroFormOf(hero, pos);
+  if (!f) return hero;
+  return { name: hero.name, pos: pos, arc: f.arc, o: f.o, s: f.s, c: f.c, m: f.m, formLabel: f.label };
+}
+function heroFormLabel(hero, pos) {
+  const f = heroFormOf(hero, pos);
+  return f ? f.label : "";
+}
+function heroHasForms(hero) { return !!(hero && HERO_FORMS[hero.name]); }
 function fitLabel(fit) {
   return fit >= 1 ? "✓ 主场" : fit >= 0.95 ? "○ 摇摆·常见" : fit >= 0.88 ? "~ 摇摆" : fit >= 0.80 ? "⚠ 逆用" : "✖ 生疏";
 }

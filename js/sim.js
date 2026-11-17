@@ -532,6 +532,8 @@ function benchBest(team, pos) {
 function posPower(p, hero, oppHero, tactic, pos, benchP) {
   if (!p || !hero || !oppHero) return 0;
   if (p.status === "inj" && p.statusRounds > 0) return 0;
+  hero = heroInPos(hero, pos);        // 多形态英雄（元流之子）：按本路形态取四维与定位
+  oppHero = heroInPos(oppHero, pos);
   let attrPower = attrPowerOf(p);
   if (benchP && BENCH_WEIGHT > 0) attrPower = attrPower * (1 - BENCH_WEIGHT) + attrPowerOf(benchP) * BENCH_WEIGHT;
   const hs = heroStrength(hero) / 100;
@@ -690,8 +692,9 @@ function aiBanHero() {
   return byThreat[idx];
 }
 // AI 读阵容：缺前排/缺输出/缺控制时，优先补对应定位（仅职业/传奇）
-function aiCompFactor(d, side, hero) {
-  const picks = d.picks[side].map(e => heroByName(e.hero)).filter(Boolean);
+function aiCompFactor(d, side, hero, pos) {
+  hero = heroInPos(hero, pos);   // 多形态英雄按本路形态判断定位
+  const picks = d.picks[side].map(e => heroInPos(heroByName(e.hero), e.pos)).filter(Boolean);
   const front = picks.filter(h => h.arc === "tank" || h.arc === "support").length;
   const dmg = picks.filter(h => ["mage", "marksman", "assassin", "fighter"].includes(h.arc)).length;
   const cc = picks.filter(h => h.c >= 70).length;
@@ -747,14 +750,15 @@ function aiPickTurn(st) {
     usePool.forEach(h => {
       const prof = profOf(starter, h.name);
       const fit = laneFit(h, pos);
-      const counter = enemyHero ? matchupMult(h, enemyHero) : 1;
-      let sc = heroStrength(h);
+      const hL = heroInPos(h, pos);            // 元流之子按本路形态参与打分
+      const counter = enemyHero ? matchupMult(hL, heroInPos(enemyHero, pos)) : 1;
+      let sc = heroStrength(hL);
       sc *= 1 + (prof - 1) * cfg.profW;        // 选手擅长（新秀权重低）
       sc *= 1 - (1 - fit) * cfg.fitW;          // 分路匹配（新秀容忍度高一点）
       sc *= 1 + (counter - 1) * cfg.counterW;  // 克制对手（新秀基本不读）
       // 战术人格：小幅偏好（±3~8%），不是固定套路
-      sc *= (per.pos[pos] || 1) * (per.arc[h.arc] || 1);
-      if (cfg.compAware) sc *= aiCompFactor(d, side, h);
+      sc *= (per.pos[pos] || 1) * (per.arc[heroInPos(h, pos).arc] || 1);
+      if (cfg.compAware) sc *= aiCompFactor(d, side, h, pos);
       sc *= 1 + cfg.noise * (rand() * 2 - 1);  // 判断噪声 = 失误率
       cands.push({ pos, hero: h, sc });
     });
@@ -873,7 +877,7 @@ function simGame() {
 }
 // 阵容 & 战术合理性：返回档位/分数/建议/战力系数
 function evaluateComp(picks, tactic) {
-  const heroes = POS.map(p => heroByName(picks[p])).filter(Boolean);
+  const heroes = POS.map(p => heroInPos(heroByName(picks[p]), p)).filter(Boolean);
   if (heroes.length < 5) return { tier: "—", score: 0, tips: ["阵容未完成"], mult: 1, fitAvg: 0 };
   const fitAvg = POS.reduce((a, p) => a + (picks[p] ? laneFit(heroByName(picks[p]), p) : 0), 0) / 5;
   const arcs = heroes.map(h => h.arc);
