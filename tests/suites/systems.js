@@ -399,4 +399,45 @@ module.exports = function (env, H) {
     S().transferWindow = true; S().loansUsed = 0;
     ok("下赛季初重新可租", T.loanBlocker(null) === null);
   });
+
+  /* 坦野补强：数据调整 + 新增英雄 + 打野英雄池保底 + 庄周解控特性 */
+  suite("坦野与英雄特性", () => {
+    const h = n => T.heroByName(n);
+    const fit = (n, pos) => T.laneFit(T.heroByName(n), pos);
+
+    ok("英雄池 124 个（新增程咬金）", T.HEROES.length === 124, T.HEROES.length);
+    ok("程咬金：对抗路 / 坦克", h("程咬金").pos === "top" && h("程咬金").arc === "tank");
+    ok("程咬金：打野逆用 0.82", Math.abs(fit("程咬金", "jungle") - 0.82) < 1e-9, fit("程咬金", "jungle"));
+
+    ok("夏侯惇：打野提到 0.95", Math.abs(fit("夏侯惇", "jungle") - 0.95) < 1e-9, fit("夏侯惇", "jungle"));
+    ok("猪八戒：打野提到 0.95", Math.abs(fit("猪八戒", "jungle") - 0.95) < 1e-9, fit("猪八戒", "jungle"));
+    ok("赵怀真：打野提到 0.90", Math.abs(fit("赵怀真", "jungle") - 0.90) < 1e-9, fit("赵怀真", "jungle"));
+    ok("亚瑟：打野降到 0.80", Math.abs(fit("亚瑟", "jungle") - 0.80) < 1e-9, fit("亚瑟", "jungle"));
+    ok("苏烈/廉颇/白起：打野不变", Math.abs(fit("苏烈", "jungle") - 0.86) < 1e-9
+      && Math.abs(fit("廉颇", "jungle") - 0.84) < 1e-9 && Math.abs(fit("白起", "jungle") - 0.84) < 1e-9);
+
+    ok("梦奇：打野主场", h("梦奇").pos === "jungle" && fit("梦奇", "jungle") === 1);
+    ok("梦奇：对抗路常见 0.95", Math.abs(fit("梦奇", "top") - 0.95) < 1e-9, fit("梦奇", "top"));
+    ok("梦奇：辅助回到生疏", fit("梦奇", "support") < 0.80, fit("梦奇", "support"));
+
+    ok("庄周：辅助主场", h("庄周").pos === "support" && fit("庄周", "support") === 1);
+    ok("庄周：其他分路一律生疏", ["top", "jungle", "mid", "bot"].every(p => fit("庄周", p) < 0.80),
+      ["top", "jungle", "mid", "bot"].map(p => fit("庄周", p)).join("/"));
+
+    // 解控特性：只对控制型英雄（c ≥ 65）生效
+    ok("庄周克制控制型英雄", T.heroTraitMult(h("庄周"), h("张良")) > 1, T.heroTraitMult(h("庄周"), h("张良")));
+    ok("庄周对非控制英雄无加成", T.heroTraitMult(h("庄周"), h("鲁班七号")) === 1);
+    ok("非庄周无此特性", T.heroTraitMult(h("张飞"), h("张良")) === 1);
+    ok("特性幅度约 6%", Math.abs(T.heroTraitMult(h("庄周"), h("张良")) - 1.06) < 1e-9);
+
+    // 打野英雄池保底：可野坦克（arc=tank 且 fit≥0.85）
+    const jt = T.HEROES.filter(x => x.arc === "tank" && T.laneFit(x, "jungle") >= 0.85).map(x => x.name);
+    ok("可野坦克池 ≥ 4 个", jt.length >= 4, jt.join("、"));
+    let miss = 0;
+    for (let i = 0; i < 200; i++) {
+      const pool = T.pickHeroes("jungle", 6);
+      if (!pool.some(nm => jt.includes(nm))) miss++;
+    }
+    ok("200 次抽样打野池都含坦野", miss === 0, miss + " 次缺失");
+  });
 };

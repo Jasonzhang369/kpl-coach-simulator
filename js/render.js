@@ -1249,7 +1249,9 @@ function renderPreview(s) {
     const lh = heroByName(mh), ohh = heroByName(oh);
     const lbl = matchupLabel(lh, ohh);
     const note = heroCounterNote(lh.name, ohh.name);
-    return `<div class="draft-row"><span class="pname">${POS_NAME[pos]}</span><span class="phero">${escapeHtml(mh)} <i class="muted">vs</i> ${escapeHtml(oh)} <b class="${lbl === '克制' ? 'c-good' : lbl === '被克' ? 'c-bad' : 'c-mid'}">${lbl}</b>${note ? ` <i class="muted" style="font-size:11px">${escapeHtml(note)}</i>` : ""}</span></div>`;
+    // 英雄特性（如庄周解控）：只在机制生效时显示，避免每行都挂一条说明
+    const trait = heroTraitNote(lh, ohh) || heroTraitNote(ohh, lh);
+    return `<div class="draft-row"><span class="pname">${POS_NAME[pos]}</span><span class="phero">${escapeHtml(mh)} <i class="muted">vs</i> ${escapeHtml(oh)} <b class="${lbl === '克制' ? 'c-good' : lbl === '被克' ? 'c-bad' : 'c-mid'}">${lbl}</b>${note ? ` <i class="muted" style="font-size:11px">${escapeHtml(note)}</i>` : ""}${trait ? ` <i class="c-good" style="font-size:11px">${escapeHtml(trait)}</i>` : ""}</span></div>`;
   }).join("");
   return `<div class="section-title mt">战前 · 战力计算</div>
   <div class="pk-wrap"><div class="pk-half ${myIsBlue ? 'blue' : 'red'}" style="width:${mp}%">我方 ${myPow}</div><div class="pk-half ${myIsBlue ? 'red' : 'blue'}" style="width:${100 - mp}%">${oppPow} 对手</div></div>

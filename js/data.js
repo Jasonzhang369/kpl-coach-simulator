@@ -39,6 +39,7 @@ const HEROES = [
   { name: "元歌", pos: "top", arc: "assassin", o: 82, s: 54, c: 60, m: 84 },
   { name: "影", pos: "top", arc: "fighter", o: 82, s: 72, c: 55, m: 76 },
   { name: "蚩奼", pos: "top", arc: "fighter", o: 82, s: 74, c: 62, m: 68 },
+  { name: "程咬金", pos: "top", arc: "tank", o: 60, s: 92, c: 42, m: 70 },
   // ===== 打野 =====
   { name: "澜", pos: "jungle", arc: "assassin", o: 86, s: 60, c: 45, m: 82 },
   { name: "镜", pos: "jungle", arc: "assassin", o: 88, s: 56, c: 40, m: 86 },
@@ -146,17 +147,17 @@ const HERO_FLEX = {
   // 对抗路主的摇摆
   吕布: { jungle: 0.88 }, 铠: { jungle: 0.97 }, 关羽: { jungle: 0.86, support: 0.83 },
   马超: { jungle: 0.96 }, 廉颇: { support: 0.94, jungle: 0.84 }, 白起: { support: 0.92, jungle: 0.84 },
-  亚瑟: { jungle: 0.90, support: 0.86 }, 老夫子: { jungle: 0.84 }, 夏侯惇: { support: 0.95, jungle: 0.86 },
+  亚瑟: { jungle: 0.80, support: 0.86 }, 老夫子: { jungle: 0.84 }, 夏侯惇: { support: 0.95, jungle: 0.95 },
   孙策: { support: 0.84, jungle: 0.84 }, 哪吒: { support: 0.82, jungle: 0.84 }, 刘邦: { support: 0.93 },
   钟无艳: { jungle: 0.84, support: 0.83 }, 曹操: { jungle: 0.98 }, 典韦: { jungle: 0.92 },
   达摩: { jungle: 0.86, support: 0.80 }, 芈月: { jungle: 0.95 }, 项羽: { support: 0.93 },
-  猪八戒: { jungle: 0.93, support: 0.88 }, 元歌: { jungle: 0.86, mid: 0.80 }, 杨戬: { jungle: 0.96 },
-  影: { jungle: 0.96 }, 蚩奼: { jungle: 0.92, bot: 0.88 },
+  猪八戒: { jungle: 0.95, support: 0.88 }, 元歌: { jungle: 0.86, mid: 0.80 }, 杨戬: { jungle: 0.96 },
+  影: { jungle: 0.96 }, 蚩奼: { jungle: 0.92, bot: 0.88 }, 程咬金: { jungle: 0.82 },
   // 打野主的摇摆
   赵云: { top: 0.88, support: 0.84 }, 橘右京: { top: 0.90, support: 0.80 }, 兰陵王: { support: 0.84 },
   雅典娜: { top: 0.90, support: 0.80 }, 东方曜: { top: 0.96 }, 云缨: { top: 0.95 },
   宫本武藏: { top: 0.94, support: 0.82 }, 盘古: { top: 0.86, support: 0.80 }, 司马懿: { mid: 0.92 },
-  诸葛亮: { mid: 0.95 }, 梦奇: { top: 0.84, support: 0.80 }, 阿古朵: { support: 0.88 },
+  诸葛亮: { mid: 0.95 }, 梦奇: { top: 0.95 }, 阿古朵: { support: 0.88 },
   // 中路主的摇摆
   不知火舞: { support: 0.86, top: 0.82 }, 上官婉儿: { top: 0.81 }, 西施: { support: 0.88 },
   沈梦溪: { support: 0.81 }, 王昭君: { support: 0.91 }, 弈星: { support: 0.86 }, 海月: { top: 0.81 },
@@ -172,9 +173,9 @@ const HERO_FLEX = {
   卢雅那: { mid: 0.82 }, 孙权: { mid: 0.82 },
   // 辅助主的摇摆
   瑶: { mid: 0.80 }, 孙膑: { mid: 0.85 }, 张飞: { top: 0.94, jungle: 0.80 }, 牛魔: { top: 0.92, jungle: 0.80 },
-  鬼谷子: { mid: 0.86 }, 东皇太一: { top: 0.90, jungle: 0.80 }, 盾山: { top: 0.86 }, 庄周: { top: 0.92, jungle: 0.80 },
+  鬼谷子: { mid: 0.86 }, 东皇太一: { top: 0.90, jungle: 0.80 }, 盾山: { top: 0.86 },
   刘禅: { top: 0.92 }, 太乙真人: { top: 0.82 }, 苏烈: { top: 0.93, jungle: 0.86 }, 钟馗: { mid: 0.88, top: 0.82, jungle: 0.80 },
-  桑启: { mid: 0.85 }, 朵莉亚: { mid: 0.85 }, 少司缘: { mid: 0.85 }, 赵怀真: { top: 0.88, jungle: 0.84 },
+  桑启: { mid: 0.85 }, 朵莉亚: { mid: 0.85 }, 少司缘: { mid: 0.85 }, 赵怀真: { top: 0.88, jungle: 0.90 },
   大禹: { top: 0.94 }, 空空儿: { mid: 0.86 }
 };
 function laneFit(hero, pos) {
@@ -187,7 +188,7 @@ function laneFit(hero, pos) {
 const HERO_SKILL = {
   吕布: "大招跳大封路", 花木兰: "双剑连招", 铠: "大招魔铠爆发", 狂铁: "一技能续航回血", 关羽: "冲锋劈砍",
   马超: "投枪拉扯", 夏洛特: "连招减速", 廉颇: "大招击飞开团", 白起: "大招嘲讽", 亚瑟: "一技能沉默",
-  老夫子: "大招捆人", 夏侯惇: "一技能击飞", 孙策: "大招开船抓人", 哪吒: "大招全图支援", 刘邦: "大招传送保人",
+  老夫子: "大招捆人", 程咬金: "大招回血续航", 夏侯惇: "一技能击飞", 孙策: "大招开船抓人", 哪吒: "大招全图支援", 刘邦: "大招传送保人",
   钟无艳: "大招石化", 曹操: "一技能突进回血", 典韦: "大招真伤", 达摩: "大招踢墙上墙", 李信: "光暗双形态",
   蒙恬: "方阵承伤", 芈月: "一技能链子续航", 司空震: "远程强化普攻", 项羽: "一技能击退", 猪八戒: "大招圈人",
   元歌: "傀儡牵制", 杨戬: "大招三段激光斩杀", 影: "影分身突进收割", 蚩奼: "大招强化突进",
@@ -213,6 +214,25 @@ const HERO_SKILL = {
   大禹: "大招治水开团", 空空儿: "二技能抓人"
 };
 function heroSkill(name) { return HERO_SKILL[name] || "技能连招"; }
+/* 英雄特性：不体现在四维上，按机制单独结算。
+   antiCC = 对「控制型英雄」（控制 c ≥ ANTI_CC_THRESHOLD）的额外战力系数。
+   庄周大招是解控，所以他对依赖硬控的先手体系天然占便宜——这是"克制控制类英雄"的落地方式。 */
+const ANTI_CC_THRESHOLD = 65;
+const HERO_TRAITS = {
+  庄周: { antiCC: 0.06, desc: "大招解控：对控制型英雄额外 +6% 战力" }
+};
+function heroTraitMult(hero, oppHero) {
+  if (!hero || !oppHero) return 1;
+  const t = HERO_TRAITS[hero.name];
+  if (!t) return 1;
+  if (t.antiCC && (oppHero.c || 0) >= ANTI_CC_THRESHOLD) return 1 + t.antiCC;
+  return 1;
+}
+function heroTraitNote(hero, oppHero) {
+  if (!hero || !oppHero) return "";
+  const t = HERO_TRAITS[hero.name];
+  return (t && t.antiCC && (oppHero.c || 0) >= ANTI_CC_THRESHOLD) ? t.desc : "";
+}
 function fitLabel(fit) {
   return fit >= 1 ? "✓ 主场" : fit >= 0.95 ? "○ 摇摆·常见" : fit >= 0.88 ? "~ 摇摆" : fit >= 0.80 ? "⚠ 逆用" : "✖ 生疏";
 }

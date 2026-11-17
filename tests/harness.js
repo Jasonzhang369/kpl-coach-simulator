@@ -70,6 +70,7 @@ globalThis.__T = {
   battleTick, finishBattle, simGame, commitGame, seriesContinue, newSeason, advanceRegular,
   myAutoPick, myAutoBan, myPeakAutoPick, aiBanHero, aiPickTurn, aiBpLevel, aiBpCfg,
   getMyTeam, teamPower, heroByName, heroStrength, laneFit, matchupMult,
+  HEROES, HERO_TRAITS, heroTraitMult, heroTraitNote, ANTI_CC_THRESHOLD, pickHeroes,
   standingsSorted, teamGameStats, rotationSuggest, applyRotation, restTeam,
   oppThreatHeroes, loanCandidates, loanSign, loanBlocker, loanFee, applyLoan, LOAN_GAMES,
   markLoanAppearances, settleLoanSeries, returnLoanedPlayer, returnAllLoans, agePlayers, settleContracts,

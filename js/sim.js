@@ -68,6 +68,16 @@ function pickHeroes(pos, n) {
   const pool = shuffle(mainPool.slice()).concat(shuffle(flexPool.slice()));
   const out = [];
   for (let i = 0; i < n && pool.length; i++) out.push(pool.splice(randInt(0, pool.length - 1), 1)[0]);
+  // 打野保底：可野坦克本来就少（阿古朵/猪八戒/夏侯惇/赵怀真/苏烈…），
+  // 纯随机时约一半打野选手一个坦野都抽不到，玩家想打坦野体系却"无牌可打"。
+  // 这里拿池子最后一位（熟练度最低的那个）换成可野坦克，不占绝活位。
+  if (pos === "jungle" && out.length) {
+    const jungleTanks = HEROES.filter(h => h.arc === "tank" && laneFit(h, "jungle") >= 0.85).map(h => h.name);
+    if (jungleTanks.length && !out.some(nm => jungleTanks.includes(nm))) {
+      const cand = jungleTanks.filter(nm => !out.includes(nm));
+      if (cand.length) out[out.length - 1] = choice(cand);
+    }
+  }
   return out;
 }
 function shuffle(a) {
@@ -532,7 +542,7 @@ function posPower(p, hero, oppHero, tactic, pos, benchP) {
   // 单局状态波动：原本 ±8%/人，5 个位置累积后战力比波动 ±5%，
   // 把玩家的 BP/训练/体能影响（±1~2%）完全淹没。收敛到 ±3%，让决策可被感知；
   // 「意外」交给局内事件（swing），那是玩家看得见、能归因的。
-  return attrPower * (0.6 + hs * 0.5) * proficient * fit * counter * statusMul(p) * tacticMul * (0.97 + rand() * 0.06);
+  return attrPower * (0.6 + hs * 0.5) * proficient * fit * counter * heroTraitMult(hero, oppHero) * statusMul(p) * tacticMul * (0.97 + rand() * 0.06);
 }
 function teamPower(team) {
   let tot = 0;
