@@ -529,11 +529,12 @@ function benchBest(team, pos) {
   if (!list.length) return null;
   return list.slice().sort((a, b) => attrPowerOf(b) - attrPowerOf(a))[0];
 }
-function posPower(p, hero, oppHero, tactic, pos, benchP) {
+function posPower(p, hero, oppHero, tactic, pos, benchP, formKey, oppFormKey) {
   if (!p || !hero || !oppHero) return 0;
   if (p.status === "inj" && p.statusRounds > 0) return 0;
-  hero = heroInPos(hero, pos);        // 多形态英雄（元流之子）：按本路形态取四维与定位
-  oppHero = heroInPos(oppHero, pos);
+  // 多形态英雄（元流之子）：按本路形态取四维与定位；打野位还可在坦克/刺客形态之间切
+  hero = heroInPos(hero, pos, formKey);
+  oppHero = heroInPos(oppHero, pos, oppFormKey);
   let attrPower = attrPowerOf(p);
   if (benchP && BENCH_WEIGHT > 0) attrPower = attrPower * (1 - BENCH_WEIGHT) + attrPowerOf(benchP) * BENCH_WEIGHT;
   const hs = heroStrength(hero) / 100;
@@ -694,7 +695,7 @@ function aiBanHero() {
 // AI 读阵容：缺前排/缺输出/缺控制时，优先补对应定位（仅职业/传奇）
 function aiCompFactor(d, side, hero, pos) {
   hero = heroInPos(hero, pos);   // 多形态英雄按本路形态判断定位
-  const picks = d.picks[side].map(e => heroInPos(heroByName(e.hero), e.pos)).filter(Boolean);
+  const picks = d.picks[side].map(e => heroInPos(heroByName(e.hero), e.pos, e.form)).filter(Boolean);
   const front = picks.filter(h => h.arc === "tank" || h.arc === "support").length;
   const dmg = picks.filter(h => ["mage", "marksman", "assassin", "fighter"].includes(h.arc)).length;
   const cc = picks.filter(h => h.c >= 70).length;
@@ -826,17 +827,17 @@ function draftPick(pos, hn) {
 function simGame() {
   const s = S.series, d = s.draft;
   const myT = getMyTeam(), opp = S.teams.find(t => t.id === s.oppId);
-  const myPicks = {}, oppPicks = {};
-  d.picks[d.mySide].forEach(e => myPicks[e.pos] = e.hero);
-  d.picks[aiSide(d)].forEach(e => oppPicks[e.pos] = e.hero);
+  const myPicks = {}, oppPicks = {}, myForms = {}, oppForms = {};
+  d.picks[d.mySide].forEach(e => { myPicks[e.pos] = e.hero; if (e.form) myForms[e.pos] = e.form; });
+  d.picks[aiSide(d)].forEach(e => { oppPicks[e.pos] = e.hero; if (e.form) oppForms[e.pos] = e.form; });
   let myTotal = 0, oppTotal = 0; const posDetail = {};
   POS.forEach(pos => {
     const mp = getPlayer(myT, myT.lineup[pos]);
     const op = getPlayer(opp, opp.lineup[pos]);
     const mh = heroByName(myPicks[pos]) || heroByName(mp.heroPool[0]);
     const oh = heroByName(oppPicks[pos]) || heroByName(op.heroPool[0]);
-    const mpow = posPower(mp, mh, oh, d.tactic, pos, benchBest(myT, pos)) * POS_WEIGHT[pos];
-    const opow = posPower(op, oh, mh, d.tactic, pos, benchBest(opp, pos)) * POS_WEIGHT[pos];
+    const mpow = posPower(mp, mh, oh, d.tactic, pos, benchBest(myT, pos), myForms[pos], oppForms[pos]) * POS_WEIGHT[pos];
+    const opow = posPower(op, oh, mh, d.tactic, pos, benchBest(opp, pos), oppForms[pos], myForms[pos]) * POS_WEIGHT[pos];
     myTotal += mpow; oppTotal += opow;
     posDetail[pos] = { mpow, opow, mh: mh.name, oh: oh.name, counter: matchupMult(mh, oh) };
   });
@@ -848,8 +849,8 @@ function simGame() {
   const ocb = comboBonus(Object.values(oppPicks));
   myTotal *= cb.mult; oppTotal *= ocb.mult;
   // 阵容 & 战术合理性判定（在胜率计算之前应用，真正影响战力与结果）
-  const myComp = evaluateComp(myPicks, d.tactic);
-  const oppComp = evaluateComp(oppPicks, "稳");
+  const myComp = evaluateComp(myPicks, d.tactic, myForms);
+  const oppComp = evaluateComp(oppPicks, "稳", oppForms);
   myTotal *= myComp.mult; oppTotal *= oppComp.mult;
   const scale = POWER_SCALE;
   // 难度不再影响战力：双方战力完全由选手属性 / 英雄强度 / 阵容判定决定，
@@ -871,13 +872,13 @@ function simGame() {
     pWin: pBase, pWinRaw, noise, swing: 0, surprises: [], finalProb: null,
     myTotal, oppTotal, myPicks, oppPicks, posDetail, mySide: d.mySide, tactic: d.tactic,
     combos: cb.hits, oppCombos: ocb.hits, comboMult: cb.mult, oppComboMult: ocb.mult,
-    myComp, oppComp, peak: !!d.peak
+    myComp, oppComp, peak: !!d.peak, myForms, oppForms
   };
   s.sub = "preview"; // 先出战力计算，等玩家点「开始比赛」
 }
 // 阵容 & 战术合理性：返回档位/分数/建议/战力系数
-function evaluateComp(picks, tactic) {
-  const heroes = POS.map(p => heroInPos(heroByName(picks[p]), p)).filter(Boolean);
+function evaluateComp(picks, tactic, forms) {
+  const heroes = POS.map(p => heroInPos(heroByName(picks[p]), p, forms && forms[p])).filter(Boolean);
   if (heroes.length < 5) return { tier: "—", score: 0, tips: ["阵容未完成"], mult: 1, fitAvg: 0 };
   const fitAvg = POS.reduce((a, p) => a + (picks[p] ? laneFit(heroByName(picks[p]), p) : 0), 0) / 5;
   const arcs = heroes.map(h => h.arc);

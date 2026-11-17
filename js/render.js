@@ -992,6 +992,23 @@ function autoBp() {
 }
 
 /* ---------------- 系列赛页面 ---------------- */
+/* 多形态英雄的形态切换条：元流之子打野默认「坦克形态」（元坦打野是主流），可切刺客形态。
+   只在 BP 未结束、且我方已选出带备选形态的英雄时出现。 */
+function renderFormBar(d) {
+  if (!d || d.over) return "";
+  const rows = (d.picks[d.mySide] || []).map(e => {
+    const h = heroByName(e.hero); if (!h || !heroHasForms(h)) return "";
+    const choices = heroFormChoices(h, e.pos);
+    if (!choices.length) return "";
+    const cur = e.form || "";
+    return `<div class="hero-opt" style="align-items:center">
+      <span class="muted" style="font-size:12px;margin-right:6px">${escapeHtml(h.name)}（${POS_NAME[e.pos]}）形态：</span>
+      ${choices.map(c => `<button class="btn ghost sm ${cur === c.key ? "gold" : ""}" data-act="mform:${c.key}" aria-pressed="${cur === c.key}" aria-label="把 ${escapeHtml(h.name)} 在${POS_NAME[e.pos]}的形态切换为${c.label}">${c.label}</button>`).join("")}
+      <span class="muted" style="font-size:11px">切形态会改变四维、战力与阵容判定（坦克形态才算前排）</span>
+    </div>`;
+  }).filter(Boolean).join("");
+  return rows ? `<div class="warn" style="border-color:rgba(52,211,224,.35);background:rgba(52,211,224,.06)">${rows}</div>` : "";
+}
 function renderSeries() {
   const s = S.series, d = s.draft;
   const myT = getMyTeam(), opp = S.teams.find(t => t.id === s.oppId);
@@ -1130,6 +1147,7 @@ function renderSeries() {
     ${renderLineupVs()}
     <div class="draft-board">${myBoard()}<div class="draft-vs">VS</div>${board(oth)}</div>
     ${renderOscmPanel(Object.fromEntries(d.picks[mySide].map(e => [e.pos, e.hero])), Object.fromEntries(d.picks[oth].map(e => [e.pos, e.hero])), opp.name)}
+    ${renderFormBar(d)}
     ${renderPastGames()}
     <div class="flex-between mt">
       <div class="hero-opt">
@@ -1252,7 +1270,7 @@ function renderPreview(s) {
     const note = heroCounterNote(lh.name, ohh.name);
     // 英雄特性（如庄周解控）：只在机制生效时显示，避免每行都挂一条说明
     const trait = heroTraitNote(lh, ohh) || heroTraitNote(ohh, lh);
-    return `<div class="draft-row"><span class="pname">${POS_NAME[pos]}</span><span class="phero">${escapeHtml(mh)} <i class="muted">vs</i> ${escapeHtml(oh)} <b class="${lbl === '克制' ? 'c-good' : lbl === '被克' ? 'c-bad' : 'c-mid'}">${lbl}</b>${note ? ` <i class="muted" style="font-size:11px">${escapeHtml(note)}</i>` : ""}${trait ? ` <i class="c-good" style="font-size:11px">${escapeHtml(trait)}</i>` : ""}</span></div>`;
+    return `<div class="draft-row"><span class="pname">${POS_NAME[pos]}</span><span class="phero">${escapeHtml(mh)}${(() => { const fl = heroFormLabel(heroByName(mh), pos, b.myForms && b.myForms[pos]); return fl ? `<i class="muted" style="font-size:10.5px">·${fl}</i>` : ""; })()} <i class="muted">vs</i> ${escapeHtml(oh)}${(() => { const fl = heroFormLabel(heroByName(oh), pos, b.oppForms && b.oppForms[pos]); return fl ? `<i class="muted" style="font-size:10.5px">·${fl}</i>` : ""; })()} <b class="${lbl === '克制' ? 'c-good' : lbl === '被克' ? 'c-bad' : 'c-mid'}">${lbl}</b>${note ? ` <i class="muted" style="font-size:11px">${escapeHtml(note)}</i>` : ""}${trait ? ` <i class="c-good" style="font-size:11px">${escapeHtml(trait)}</i>` : ""}</span></div>`;
   }).join("");
   return `<div class="section-title mt">战前 · 战力计算</div>
   <div class="pk-wrap"><div class="pk-half ${myIsBlue ? 'blue' : 'red'}" style="width:${mp}%">我方 ${myPow}</div><div class="pk-half ${myIsBlue ? 'red' : 'blue'}" style="width:${100 - mp}%">${oppPow} 对手</div></div>

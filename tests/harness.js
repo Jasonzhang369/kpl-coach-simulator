@@ -71,7 +71,7 @@ globalThis.__T = {
   myAutoPick, myAutoBan, myPeakAutoPick, aiBanHero, aiPickTurn, aiBpLevel, aiBpCfg,
   getMyTeam, teamPower, heroByName, heroStrength, laneFit, matchupMult,
   HEROES, HERO_TRAITS, heroTraitMult, heroTraitNote, ANTI_CC_THRESHOLD, pickHeroes,
-  HERO_FORMS, heroInPos, heroFormOf, heroHasForms, heroFormLabel, posPower, evaluateComp,
+  HERO_FORMS, heroInPos, heroFormOf, heroHasForms, heroFormLabel, heroFormChoices, posPower, evaluateComp,
   standingsSorted, teamGameStats, rotationSuggest, applyRotation, restTeam,
   oppThreatHeroes, loanCandidates, loanSign, loanBlocker, loanFee, applyLoan, LOAN_GAMES,
   markLoanAppearances, settleLoanSeries, returnLoanedPlayer, returnAllLoans, agePlayers, settleContracts,

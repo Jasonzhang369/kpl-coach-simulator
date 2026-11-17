@@ -251,24 +251,37 @@ const HERO_FORMS = {
   元流之子: {
     mid:     { arc: "mage",     o: 82, s: 50, c: 62, m: 58, label: "法师形态", lane: "中路" },
     top:     { arc: "tank",     o: 58, s: 90, c: 72, m: 52, label: "坦克形态", lane: "对抗路" },
-    jungle:  { arc: "assassin", o: 86, s: 58, c: 45, m: 84, label: "刺客形态", lane: "打野" },
+    // 打野位：元坦打野是赛事主流（前排 + 团控），所以默认坦克形态，另可切刺客形态打野
+    jungle:  { arc: "tank",     o: 58, s: 90, c: 72, m: 52, label: "坦克形态", lane: "打野",
+               alts: [{ key: "assassin", arc: "assassin", o: 86, s: 58, c: 45, m: 84, label: "刺客形态", lane: "打野" }] },
     bot:     { arc: "marksman", o: 84, s: 48, c: 55, m: 62, label: "射手形态", lane: "发育路" },
     support: { arc: "support",  o: 54, s: 76, c: 84, m: 62, label: "辅助形态", lane: "游走" }
   }
 };
-function heroFormOf(hero, pos) {
+/* formKey 用于「同一分路可选形态」（目前只有元流之子打野：坦克 / 刺客），不传则用默认形态 */
+function heroFormOf(hero, pos, formKey) {
   const forms = hero && HERO_FORMS[hero.name];
-  return (forms && forms[pos]) || null;
+  const f = (forms && forms[pos]) || null;
+  if (!f || !formKey) return f;
+  const alt = (f.alts || []).find(a => a.key === formKey);
+  return alt || f;
 }
 /* 按分路取"形态后的英雄"：没有多形态的返回原对象（不产生额外开销） */
-function heroInPos(hero, pos) {
-  const f = heroFormOf(hero, pos);
+function heroInPos(hero, pos, formKey) {
+  const f = heroFormOf(hero, pos, formKey);
   if (!f) return hero;
-  return { name: hero.name, pos: pos, arc: f.arc, o: f.o, s: f.s, c: f.c, m: f.m, formLabel: f.label };
+  return { name: hero.name, pos: pos, arc: f.arc, o: f.o, s: f.s, c: f.c, m: f.m, formLabel: f.label, formKey: f.key || null };
 }
-function heroFormLabel(hero, pos) {
-  const f = heroFormOf(hero, pos);
+function heroFormLabel(hero, pos, formKey) {
+  const f = heroFormOf(hero, pos, formKey);
   return f ? f.label : "";
+}
+/* 该英雄在这个分路有哪几种形态可选（默认 + 备选），用于 BP 界面切换 */
+function heroFormChoices(hero, pos) {
+  const forms = hero && HERO_FORMS[hero.name];
+  const f = (forms && forms[pos]) || null;
+  if (!f || !f.alts || !f.alts.length) return [];
+  return [{ key: "", label: f.label }].concat(f.alts.map(a => ({ key: a.key, label: a.label })));
 }
 function heroHasForms(hero) { return !!(hero && HERO_FORMS[hero.name]); }
 function fitLabel(fit) {

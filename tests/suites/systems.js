@@ -454,9 +454,15 @@ module.exports = function (env, H) {
     const ud = h("元流之子");
     ok("元流之子：五路都算主场", ["top", "jungle", "mid", "bot", "support"].every(p => T.laneFit(ud, p) === 1));
     ok("元流之子：只有一份英雄条目", T.HEROES.filter(x => x.name === "元流之子").length === 1);
-    const expect = { mid: "mage", top: "tank", jungle: "assassin", bot: "marksman", support: "support" };
-    ok("五形态定位正确", Object.keys(expect).every(p => T.heroInPos(ud, p).arc === expect[p]),
+    // 打野默认是「元坦」形态（元坦打野是赛事主流），刺客形态作为备选
+    const expect = { mid: "mage", top: "tank", jungle: "tank", bot: "marksman", support: "support" };
+    ok("五形态定位正确（打野默认坦克）", Object.keys(expect).every(p => T.heroInPos(ud, p).arc === expect[p]),
       Object.keys(expect).map(p => p + ":" + T.heroInPos(ud, p).arc).join(" "));
+    ok("打野可切刺客形态", T.heroInPos(ud, "jungle", "assassin").arc === "assassin"
+      && T.heroInPos(ud, "jungle", "assassin").o === 86);
+    ok("打野有两个形态可选", T.heroFormChoices(ud, "jungle").length === 2, JSON.stringify(T.heroFormChoices(ud, "jungle")));
+    ok("其他分路是固定形态（无备选）", T.heroFormChoices(ud, "top").length === 0 && T.heroFormChoices(ud, "mid").length === 0);
+    ok("未知形态 key 回落到默认", T.heroInPos(ud, "jungle", "nope").arc === "tank");
     ok("形态四维确实不同",
       T.heroInPos(ud, "top").s !== T.heroInPos(ud, "bot").s
       && T.heroInPos(ud, "jungle").o !== T.heroInPos(ud, "support").o);
@@ -468,6 +474,12 @@ module.exports = function (env, H) {
     const c2 = T.evaluateComp(mk("吕布"), "稳");
     ok("元流之子坦克形态算前排", c1.tips.indexOf("前排充足，团战能扛") >= 0, c1.tips.join("/"));
     ok("换成战士则前排不足", c2.tips.indexOf("前排充足，团战能扛") < 0, c2.tips.join("/"));
+
+    // 元坦打野：打野位选坦克形态也算前排；切刺客形态就不算
+    const jt = T.evaluateComp({ top: "吕布", jungle: "元流之子", mid: "小乔", bot: "孙尚香", support: "张飞" }, "稳", { jungle: "tank" });
+    const ja = T.evaluateComp({ top: "吕布", jungle: "元流之子", mid: "小乔", bot: "孙尚香", support: "张飞" }, "稳", { jungle: "assassin" });
+    ok("元坦打野算前排", jt.tips.indexOf("前排充足，团战能扛") >= 0, jt.tips.join("/"));
+    ok("切刺客形态打野则不算前排", ja.tips.indexOf("前排充足，团战能扛") < 0, ja.tips.join("/"));
 
     // 战力：同一英雄不同分路形态，战力应有系统性差异（坦克形态生存高、法师形态输出高）
     H.newGame(env, { difficulty: "职业" });
@@ -488,5 +500,17 @@ module.exports = function (env, H) {
     const draftHtml = root();
     ok("选将台能选到元流之子", draftHtml.indexOf("元流之子") >= 0);
     ok("元流之子标注为五形态", /元流之子[\s\S]{0,120}五形态/.test(draftHtml));
+
+    // 我方选出「元流之子·打野」后，界面上应出现形态切换；点击后写进 pick.form
+    const d = T.getS().series.draft;
+    d.picks[d.mySide] = d.picks[d.mySide].filter(x => x.pos !== "jungle");
+    d.picks[d.mySide].push({ pos: "jungle", hero: "元流之子" });
+    T.renderSeries();
+    ok("出现形态切换按钮", root().indexOf("data-act=\"mform:assassin\"") >= 0);
+    T.handleAct("mform:assassin");
+    const pick = T.getS().series.draft.picks[d.mySide].find(x => x.pos === "jungle" && x.hero === "元流之子");
+    ok("切换后写入 pick.form", pick && pick.form === "assassin", pick && pick.form);
+    T.handleAct("mform:");
+    ok("切回默认形态", pick.form === "", JSON.stringify(pick.form));
   });
 };
