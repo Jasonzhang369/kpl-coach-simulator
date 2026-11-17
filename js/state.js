@@ -695,6 +695,8 @@ function startMatch() {
 }
 function startSeries(oppId, bestOf, kind, slot, label) {
   const firstSide = rand() < 0.5 ? "blue" : "red";
+  // 新的大场开始：清掉「上一场是否出场」的临时标记（计数单位 = 大场，每场重新判定）
+  (S.loans || []).forEach(l => { l.played = false; });
   // 转会窗口只在赛季初开放：打第一场常规赛即关闭
   if (kind === "regular" && S.transferWindow) { S.transferWindow = false; S.market = null; }
   // 季后赛「休整日」：季后赛是连续 BO7，没有轮间恢复可依赖；
@@ -824,7 +826,6 @@ function seriesContinue() {
 }
 function advanceRegular() {
   tickStatuses();
-  loanTick();                       // 租借到期自动返回
   const remaining = S.schedule.filter(s => !s.played).length;
   if (remaining > 0) {
     S.round++;

@@ -325,12 +325,61 @@ module.exports = function (env, H) {
     ok("租借球员带 loan 标记", t1.players[pos].some(p => p.loan && p.name === c.p.name));
     ok("再租被次数限制拦下", T.loanBlocker(T.loanCandidates()[0]) === "本赛季租借次数已用完", T.loanBlocker(T.loanCandidates()[0]));
 
-    // 「剩余 N 轮」要跟着 tick 递减（旧版永远显示 3）
-    T.loanTick();
-    ok("1 轮后记录剩余 2 轮", S().loans[0] && S().loans[0].roundsLeft === 2, S().loans[0] && S().loans[0].roundsLeft);
-    T.loanTick(); T.loanTick();
-    ok("3 轮后自动返回", (S().loans || []).length === 0, (S().loans || []).length);
-    ok("返回后人数复原", T.getMyTeam().players[pos].length === n0, T.getMyTeam().players[pos].length);
+    // 计数单位 = 他「出场过的大场」：坐板凳不计，一个小局上过即算 1 场，季后赛同样计入
+    const moved = t1.players[pos].find(p => p.loan && p.name === c.p.name);
+    const origStarter = t1.lineup[pos];
+    ok("租借球员进队后默认在替补席", origStarter !== moved.id);
+    ok("初始剩余 = LOAN_GAMES 场", S().loans[0].roundsLeft === T.LOAN_GAMES, S().loans[0].roundsLeft);
+
+    // 打完一场（中途不点继续，避免推进轮次/季后赛分支）
+    const playToOver = () => {
+      const S2 = T.getS();
+      let g = 0;
+      while (S2.series && S2.series.sub !== "over" && g++ < 200) {
+        const s = S2.series;
+        if (s.sub === "draft") { let k = 0; while (S2.series.draft && !S2.series.draft.over && k++ < 60) T.autoBpStep(); continue; }
+        if (s.sub === "preview") { s.sub = "battle"; continue; }
+        if (s.sub === "battle") { let k = 0; while (S2.series.sub === "battle" && k++ < 90) T.battleTick(); continue; }
+        if (s.sub === "result") { T.handleAct("seriesnext"); continue; }
+        if (s.sub === "sub") { if (s.nextSideBy === "me" && !s.nextSide) s.nextSide = s.firstSide || "blue"; T.newGameDraft(); continue; }
+        break;
+      }
+      return S2.series;
+    };
+    const oppId = S().teams.find(t => t.id !== S().myTeamId).id;
+
+    // A) 全程坐板凳打一场 → 不计次
+    T.startSeries(oppId, 5, "regular", null, "测·板凳");
+    playToOver();
+    ok("坐板凳打完一场不扣次数", S().loans[0] && S().loans[0].roundsLeft === T.LOAN_GAMES, S().loans[0] && S().loans[0].roundsLeft);
+
+    // B) 提进首发打一场常规赛 → 扣 1
+    T.getMyTeam().lineup[pos] = moved.id;
+    T.startSeries(oppId, 5, "regular", null, "测·首发1");
+    playToOver();
+    ok("首发出场 1 场 → 剩余 2", S().loans[0] && S().loans[0].roundsLeft === 2, S().loans[0] && S().loans[0].roundsLeft);
+
+    // C) 季后赛也计数
+    T.startSeries(oppId, 7, "playoff", "ub1", "测·季后赛");
+    playToOver();
+    ok("季后赛出场也扣 1 → 剩余 1", S().loans[0] && S().loans[0].roundsLeft === 1, S().loans[0] && S().loans[0].roundsLeft);
+
+    // D) 第 3 次出场 → 到期归队，且不会在系列赛中途被抽走
+    T.startSeries(oppId, 5, "regular", null, "测·首发3");
+    // 只打第 1 小局，检查局中没有把人抽走
+    let kd = 0;
+    while (S().series.draft && !S().series.draft.over && kd++ < 60) T.autoBpStep();
+    S().series.sub = "battle";
+    let kb = 0;
+    while (S().series.sub === "battle" && kb++ < 90) T.battleTick();
+    ok("小局打完仍在队里（不到大场结束不归队）", T.getMyTeam().players[pos].some(p => p.loan));
+    ok("小局打完剩余场次还没扣", S().loans[0] && S().loans[0].roundsLeft === 1, S().loans[0] && S().loans[0].roundsLeft);
+    playToOver();
+    ok("第 3 次出场后自动返回", (S().loans || []).length === 0, (S().loans || []).length);
+    ok("归队后人数复原", T.getMyTeam().players[pos].length === n0, T.getMyTeam().players[pos].length);
+    ok("归队后不再带 loan 标记", !T.getMyTeam().players[pos].some(p => p.loan));
+    ok("租借球员回到原队", (c.fromTeam.players[pos] || []).some(p => p.name === c.p.name));
+    S().series = null; S().page = "main"; T.render();
 
     // 打第一场常规赛 → 窗口关闭 → 租借必须不可用
     S().transferWindow = false;

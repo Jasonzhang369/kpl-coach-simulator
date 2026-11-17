@@ -687,7 +687,7 @@ function renderMarket() {
       <h4>${escapeHtml(c.p.name)} <span class="pill" style="font-size:10px;color:${ratingColor(c.p.rating)};border-color:${ratingColor(c.p.rating)}">${c.p.rating}</span></h4>
       <div class="lv">总评 ${c.p.ovr} · ${c.p.age || "?"}岁 · 来自 ${escapeHtml(c.fromTeam.name)}（替补）</div>
       <div class="flex-between mt"><span style="color:var(--gold);font-weight:800">租费 ¥${fee}万</span>
-      <button class="btn sm ${can ? '' : 'ghost'}" data-act="loanin:${escapeHtml(c.p.id)}" ${can ? '' : 'disabled'} title="${escapeHtml(blocker || "")}" aria-label="租借 ${escapeHtml(c.p.name)}，租费 ${fee} 万，期限 3 轮${blocker ? "，当前不可用：" + escapeHtml(blocker) : ""}">租借 3 轮</button></div>
+      <button class="btn sm ${can ? '' : 'ghost'}" data-act="loanin:${escapeHtml(c.p.id)}" ${can ? '' : 'disabled'} title="${escapeHtml(blocker || "")}" aria-label="租借 ${escapeHtml(c.p.name)}，租费 ${fee} 万，出场 ${LOAN_GAMES} 场后归队${blocker ? "，当前不可用：" + escapeHtml(blocker) : ""}">租借 ${LOAN_GAMES} 场</button></div>
     </div>`;
   };
   const loanHead = open
@@ -695,9 +695,9 @@ function renderMarket() {
     : `<span style="color:var(--red2)">🔴 租借窗口已关闭</span>`;
   const loanBlock = `<div class="section-title" style="margin-top:18px">赛季初租借（${loanHead}）</div>
     <div class="muted mb" style="font-size:12.5px">和转会买卖<b>同一个窗口</b>：每个赛季初开放，打第一场常规赛后关闭，下赛季重新开放。
-      租借费 = 身价 <b>25%</b>，<b>3 轮后自动返回</b>原队，每赛季限 <b>${S.maxLoans || 1}</b> 次（剩余 <b>${loanLeft}</b> 次）。
+      租借费 = 身价 <b>25%</b>，<b>出场 ${LOAN_GAMES} 场后自动返回</b>原队 —— <b>只统计他真正上场的大场</b>（一个小局上过就算 1 场，季后赛同样计入；坐板凳不计）。每赛季限 <b>${S.maxLoans || 1}</b> 次（剩余 <b>${loanLeft}</b> 次）。
       ${open ? "" : `<br><b style="color:var(--red2)">现在不可租借：${escapeHtml(loanBlocker(null) || "")}</b>`}
-      ${(S.loans || []).length ? `<br>租借中：${S.loans.map(l => `${POS_NAME[l.pos]}【${escapeHtml(l.name)}】剩余 ${l.roundsLeft} 轮`).join("、")}` : ""}</div>
+      ${(S.loans || []).length ? `<br>租借中：${S.loans.map(l => `${POS_NAME[l.pos]}【${escapeHtml(l.name)}】剩余 ${l.roundsLeft} 场`).join("、")}` : ""}</div>
     <div class="grid market-grid">${loanCandidates().slice(0, 6).map(loanCard).join("") || '<div class="muted">暂无可租借的替补</div>'}</div>`;
   return `<div class="section-title">转会市场（赛季转会 ${S.transfersUsed} / ${S.maxTransfers}）</div>
   ${windowBar}
@@ -759,7 +759,7 @@ function renderFormat() {
   <div class="report-line"><span class="tag key">积分榜</span><span class="body">前 <b>4 名高亮</b>并标出<b>晋级线</b>。并列时依次比较：① 积分（胜 +2）→ ② <b>小分</b>（系列赛净胜局 = 拿下局数 − 丢掉局数）→ ③ <b>相互战绩</b>（两队直接交手）→ ④ 总胜场 → ⑤ 总负场。</span></div>
   <div class="report-line"><span class="tag key">体能</span><span class="body">每局消耗 <b>${staminaCostPerGame()}</b> 体能（下限 ${STAMINA_FLOOR}，有体能教练会降低）；≤60 标「体能偏低」、≤45 标「体力告急」红标。恢复途径：<b>轮间自然 +${ROUND_STAMINA_GAIN}</b>（每轮开赛前）· <b>全队休息 +${restGain()}</b>（2 训练点，<b>只有大场打完后才能休息</b>，系列赛局间不可）· <b>季后赛每场开赛前 +${PLAYOFF_REST_GAIN}</b>（休整日，AI 同规则）· 赛季重置 +25。系列赛局间只能<b>换人</b>或<b>一键轮换</b>。</span></div>
   <div class="report-line"><span class="tag key">年龄合同</span><span class="body"><b>3 个赛季 = 1 岁</b>：第 4、7、10… 赛季开始时全联盟年龄 +1（顶栏显示「第 N 年」）。<b>26 岁以上开始衰退</b>，而且是<b>逐季</b>掉：<b>27~29 岁</b>每赛季操作/意识/配合/心态 <b>−1</b>、成长上限 −1；<b>30 岁起</b>每赛季 <b>−2</b>、上限 −2（练不回来）。≤26 岁仍有成长机会（21 岁以下最高，27 岁起不再成长）。<b>合同按赛季计（2~6 赛季）</b>，赛季末 −1；到期自动续约（身价 50%，主力或 A 级以上且资金足够），否则<b>离队进自由身池</b>；也可在【战队】页手动续约（3~6 赛季）。</span></div>
-  <div class="report-line"><span class="tag key">赛季初租借</span><span class="body"><b>和转会买卖同一个窗口</b>：每赛季初开放、打第一场常规赛后关闭。窗口内可从其他战队<b>租借替补</b>：租费 = 身价 <b>25%</b>，期限 <b>3 轮</b>，到期<b>自动返回原队</b>。每赛季限 <b>${S.maxLoans || 1}</b> 次，入口在【转会】页。</span></div>
+  <div class="report-line"><span class="tag key">赛季初租借</span><span class="body"><b>和转会买卖同一个窗口</b>：每赛季初开放、打第一场常规赛后关闭。窗口内可从其他战队<b>租借替补</b>：租费 = 身价 <b>25%</b>，<b>出场 ${LOAN_GAMES} 场</b>后自动返回原队（只算他真正上场的大场，一个小局上过即算 1 场，季后赛也算；坐板凳不计）。每赛季限 <b>${S.maxLoans || 1}</b> 次，入口在【转会】页。</span></div>
   <div class="report-line"><span class="tag key">难度</span><span class="body"><b>难度 = 对手的 BP 水平</b>，<b>不改动任何战力/属性</b>：<b>新秀</b> 会犯小错——多数回合只按版本强度 ban（很少主动针对你的英雄池）、基本不读克制、偶尔拿舒适英雄，但仍会认分路、挑强度高的英雄；<b>职业</b> 会读克制、照顾自家选手擅长、补阵容前排与输出，ban 会瞄着你的核心；<b>传奇</b> 近乎最优，几乎总拿最强解，ban 基本必中你的第一核心。<b>名单模式</b>（平衡选秀 / 真实大名单）是另一个维度，只决定 12 队怎么分人；<b>真实大名单下对手 BP 固定按「传奇」</b>。</span></div>
   <div class="report-line"><span class="tag key">音乐</span><span class="body">BGM 与音效都是 <b>Web Audio 实时合成</b>（仓库里没有音频文件）：主菜单一首、比赛一首、<b>巅峰对决（第 7 局）有专属曲</b>、夺冠还有一段短曲。顶栏 <b>⚙ 设置</b>可分别调背景音乐 / 音效 / 总音量的开关与大小（对所有存档生效）。想换成自己的巅峰对决 BGM：把音频命名为 <code style="background:var(--bg2);padding:1px 5px;border-radius:4px">audio/peak.mp3</code> 放进游戏目录即可，检测不到就回退内置曲。</span></div>
   <div class="report-line"><span class="tag key">界面</span><span class="body">顶栏右侧：💾 改存档名 · 📖 <b>游玩指南</b>（首次开档自动弹一次）· ⚙ 设置 · ? 快捷键 · 🏠 <b>返回首页</b>（自动存档；系列赛没打完会先确认）。</span></div>

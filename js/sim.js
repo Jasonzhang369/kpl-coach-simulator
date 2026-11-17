@@ -434,6 +434,9 @@ const ROUND_STAMINA_GAIN = 11; // 每轮自然恢复：略低于一场 BO5 的�
 const PLAYOFF_REST_GAIN = 18;  // 季后赛每场开赛前的「休整日」，低于一场 BO7 的消耗（连续打会掉体能）
 const STAMINA_FLOOR = 35;
 
+/* 租借期限：按「他出场过的大场」计（常规赛、季后赛都算），一个小局上过即算本场 1 次 */
+const LOAN_GAMES = 3;
+
 /* ---------------- 教练组（职员） ----------------
    现实里教练不是自己练属性，而是"配班子"：花钱请人，换长期收益。
    一次性聘用费 + 每赛季工资（赛季末结算，付不起会有人离职）。 */
@@ -967,6 +970,7 @@ function commitGame(b) {
   });
   // 败方选边权（下一局红蓝方由败方决定）
   s.nextSideBy = b.myWin ? "opp" : "me";
+  markLoanAppearances();          // 他这一小局是否首发上场（决定本大场算不算 1 次租借出场）
   const need = Math.ceil(s.bestOf / 2);
   if (s.myScore >= need || s.opScore >= need) {
     s.sub = "over";
@@ -977,6 +981,7 @@ function commitGame(b) {
       fans: Math.round((win ? randInt(5000, 15000) : -randInt(1000, 6000)) * (1 + myT.prestige / 150)),
       win
     };
+    settleLoanSeries();           // 大场之间结算租借（常规赛与季后赛一致），绝不在局中抽人
   } else {
     if (s.nextSideBy === "opp") s.nextSide = rand() < 0.5 ? "blue" : "red"; // AI（败方）自动选边
     s.sub = "result";
@@ -1733,7 +1738,7 @@ function loanSign(key) {
   const fee = loanFee(c);
   confirmDialog({
     title: "赛季初租借",
-    body: `从 <b>${escapeHtml(c.fromTeam.name)}</b> 租借 ${POS_NAME[c.pos]}【<b>${escapeHtml(c.p.name)}</b>】（总评 ${c.p.ovr}）。<br>租借费 <b style="color:var(--gold)">¥${fee}万</b>，期限 <b>3 轮</b>，到期自动返回原队。<br>本赛季剩余租借次数：${(S.maxLoans || 1) - (S.loansUsed || 0)} 次。`,
+    body: `从 <b>${escapeHtml(c.fromTeam.name)}</b> 租借 ${POS_NAME[c.pos]}【<b>${escapeHtml(c.p.name)}</b>】（总评 ${c.p.ovr}）。<br>租借费 <b style="color:var(--gold)">¥${fee}万</b>，期限 <b>出场 ${LOAN_GAMES} 场</b>（只算他真正上场的大场，一个小局上过即算 1 场，季后赛同样计入），到期自动返回原队。<br>本赛季剩余租借次数：${(S.maxLoans || 1) - (S.loansUsed || 0)} 次。`,
     okText: "确认租借"
   }).then(ok => {
     if (!ok) return;
@@ -1751,45 +1756,70 @@ function applyLoan(c) {
   if (idx === -1) { toast("该选手已被其他队签走"); render(); return false; }
   snapshot(`租借 ${c.p.name}`);
   const moved = c.fromTeam.players[c.pos].splice(idx, 1)[0];
-  moved.loan = { fromTeamId: c.fromTeam.id, roundsLeft: 3, origId: moved.id };
+  moved.loan = { fromTeamId: c.fromTeam.id, roundsLeft: LOAN_GAMES, origId: moved.id };
   if (c.fromTeam.players[c.pos].length === 0) c.fromTeam.players[c.pos].push(takeFreeAgent(c.pos));
   initLineup(c.fromTeam);
   t.players[c.pos].push(moved);
   t.money -= fee; c.fromTeam.money += fee;
   S.loansUsed = (S.loansUsed || 0) + 1;
   S.loans = S.loans || [];
-  S.loans.push({ name: moved.name, pos: c.pos, fromTeamId: c.fromTeam.id, roundsLeft: 3 });
-  S.log.unshift(`S${S.season} 租借：从 ${c.fromTeam.name} 租入 ${moved.name}（¥${fee}万 / 3轮）`);
-  toast(`租入【${moved.name}】（3 轮后自动返回）`);
+  S.loans.push({ name: moved.name, pos: c.pos, fromTeamId: c.fromTeam.id, roundsLeft: LOAN_GAMES, played: false });
+  S.log.unshift(`S${S.season} 租借：从 ${c.fromTeam.name} 租入 ${moved.name}（¥${fee}万 / 出场 ${LOAN_GAMES} 场）`);
+  toast(`租入【${moved.name}】（出场 ${LOAN_GAMES} 场后自动返回；记得去【阵容】提首发才算）`);
   save(); render();
   return true;
 }
-function loanTick() {
-  const t = getMyTeam();
-  if (!t || !S.loans) return;
-  const back = [];
-  POS.forEach(pos => t.players[pos].slice().forEach(p => {
-    if (!p.loan) return;
-    p.loan.roundsLeft--;
-    // 面板上的「剩余 N 轮」读的是 S.loans 里的记录，这里必须同步，否则永远显示 3
-    const rec = (S.loans || []).find(l => l.name === p.name && l.pos === pos);
-    if (rec) rec.roundsLeft = p.loan.roundsLeft;
-    if (p.loan.roundsLeft > 0) return;
-    const idx = t.players[pos].findIndex(x => x.id === p.id);
-    if (idx !== -1) t.players[pos].splice(idx, 1);
-    const src = S.teams.find(x => x.id === p.loan.fromTeamId);
-    delete p.loan;
-    if (src) { src.players[pos].push(p); initLineup(src); }
-    else recycleToFreeAgents(p);
-    back.push(`${p.name}`);
-    if (t.lineup[pos] === p.id) initLineup(t);
-    if (!t.players[pos].length) t.players[pos].push(takeFreeAgent(pos));
-    initLineup(t);
-  }));
-  S.loans = (S.loans || []).filter(l => !back.includes(l.name));
-  if (back.length) { S.log.unshift(`S${S.season}R${S.round} 租借到期：${back.join("、")} 已返回原队`); toast(`租借到期：${back.join("、")} 返回原队`); }
+/* 把一名租借球员送回原队（到期/赛季结束都走这里） */
+function returnLoanedPlayer(t, pos, p) {
+  if (!t || !p || !p.loan) return null;
+  const idx = t.players[pos].findIndex(x => x.id === p.id);
+  if (idx !== -1) t.players[pos].splice(idx, 1);
+  const src = S.teams.find(x => x.id === p.loan.fromTeamId);
+  const name = p.name;
+  delete p.loan;
+  if (src) { src.players[pos].push(p); initLineup(src); } else recycleToFreeAgents(p);
+  if (t.lineup[pos] === p.id) initLineup(t);
+  if (!t.players[pos].length) t.players[pos].push(takeFreeAgent(pos));
+  initLineup(t);
+  return name;
 }
-function loanReturnById(key) { /* 兼容占位：租借到期自动返回 */ }
+/* 本小局里他是否首发上场？只要某一小局上过，本大场就算 1 次出场（计数单位是大场，不是小局） */
+function markLoanAppearances() {
+  if (!S.loans || !S.loans.length) return;
+  const t = getMyTeam();
+  if (!t) return;
+  S.loans.forEach(rec => {
+    if (rec.played) return;
+    const p = (t.players[rec.pos] || []).find(x => x.name === rec.name && x.loan);
+    if (p && t.lineup[rec.pos] === p.id) rec.played = true;
+  });
+}
+/* 系列赛结束时结算租借：本场出场过 → 剩余场次 -1；用完的回原队。
+   只在两个大场之间调用，绝不会在 BO5/BO7 的第 5、6、7 局中途把人抽走。常规赛与季后赛同一套逻辑。 */
+function settleLoanSeries() {
+  const t = getMyTeam();
+  if (!t || !S.loans || !S.loans.length) return;
+  const gone = [];
+  S.loans.forEach(rec => {
+    if (!rec.played) return;               // 整场一分钟没上 → 不计次
+    rec.played = false;
+    rec.roundsLeft--;
+    if (rec.roundsLeft <= 0) gone.push(rec);
+  });
+  S.loans = S.loans.filter(r => r.roundsLeft > 0);
+  const names = [];
+  gone.forEach(rec => {
+    const p = (t.players[rec.pos] || []).find(x => x.name === rec.name && x.loan);
+    const nm = p ? returnLoanedPlayer(t, rec.pos, p) : null;
+    if (nm) names.push(nm);
+  });
+  if (names.length) {
+    S.log.unshift(`S${S.season} 租借到期：${names.join("、")} 已返回原队（累计出场 ${LOAN_GAMES} 场）`);
+    toast(`租借到期：${names.join("、")} 返回原队`);
+  }
+}
+/* 兼容占位 */
+function loanReturnById(key) { /* 租借只在赛季初可签，到期自动返回 */ }
 // 赛季结束时把所有租借球员强行退回原队（避免跨赛季残留）
 function returnAllLoans() {
   const t = getMyTeam();
