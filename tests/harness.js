@@ -71,7 +71,7 @@ globalThis.__T = {
   myAutoPick, myAutoBan, myPeakAutoPick, aiBanHero, aiPickTurn, aiBpLevel, aiBpCfg,
   getMyTeam, teamPower, heroByName, heroStrength, laneFit, matchupMult,
   standingsSorted, teamGameStats, rotationSuggest, applyRotation, restTeam,
-  oppThreatHeroes, loanCandidates, loanSign, loanTick, agePlayers, settleContracts,
+  oppThreatHeroes, loanCandidates, loanSign, loanBlocker, loanFee, applyLoan, loanTick, returnAllLoans, agePlayers, settleContracts,
   seasonYear, isAgeYearTick, ageDecline, growthChance, trainCost, priceFor, sellPrice, renewCost, breakCost,
   availBanHeroes, availPickHeroes, filledPos, aiSide, currentStep, POS, POS_NAME,
   profOf, masteryOf, masteryLabel, myBestMastery, stCapOf, trainHero, openHeroTrain,

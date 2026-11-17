@@ -286,4 +286,68 @@ module.exports = function (env, H) {
     const top = root();
     ["openguide", "opensettings", "gotitle"].forEach(a => ok(`顶栏含 ${a}`, top.indexOf(`data-act="${a}"`) >= 0));
   });
+
+  /* 租借：必须和转会买卖共用一个窗口（每赛季初开放），而不是"窗口关闭后才可用" */
+  suite("赛季初租借窗口", () => {
+    T.newGame({ difficulty: "职业", rosterMode: "draft", teamName: "成都AG超玩会", slot: 1 });
+    ok("新赛季转会窗口默认开放", S().transferWindow === true);
+    ok("窗口开放时可以租借", T.loanBlocker(null) === null, T.loanBlocker(null));
+    const t0 = T.getMyTeam();
+    t0.money = 600;
+    const cands = T.loanCandidates();
+    ok("有可租借的替补", cands.length > 0, cands.length);
+    const c = cands.find(x => t0.players[x.pos].length < 4) || cands[0];
+    ok("选中目标可用", T.loanBlocker(c) === null, T.loanBlocker(c));
+
+    // UI：窗口开放 → 按钮可点，文案是「赛季初租借」
+    S().tab = "market"; S().market = null; T.handleAct("tab:market");
+    const htmlOpen = root();
+    const btnsOpen = (htmlOpen.match(/<button[^>]*data-act="loanin:[^"]*"[^>]*>/g) || []);
+    ok("标题写「赛季初租借」", htmlOpen.indexOf("赛季初租借") >= 0);
+    ok("区块提示窗口开放中", htmlOpen.indexOf("租借窗口开放中") >= 0);
+    ok("渲染出 6 张租借卡", btnsOpen.length === 6, btnsOpen.length);
+    ok("窗口开放时租借按钮全部可点", btnsOpen.every(b => b.indexOf("disabled") < 0), btnsOpen.filter(b => b.indexOf("disabled") >= 0).length);
+    // 关键回归：按钮上的标识必须对得上候选（旧版用 indexOf 对新建对象，恒为 -1 → 点了必报"目标已不可用"）
+    const acts = (htmlOpen.match(/data-act="loanin:([^"]*)"/g) || []).map(s => s.slice('data-act="loanin:'.length, -1));
+    const ids = cands.map(x => String(x.p.id));
+    ok("租借按钮的标识能在候选里对上", acts.length > 0 && acts.every(a => ids.indexOf(a) >= 0), acts.slice(0, 3).join(","));
+    ok("不再出现「赛中租借」", htmlOpen.indexOf("赛中租借") < 0);
+
+    // 真正租一次
+    const pos = c.pos, n0 = t0.players[pos].length, money0 = t0.money, fee = T.loanFee(c);
+    ok("执行租借成功", T.applyLoan(c) === true);
+    const t1 = T.getMyTeam();
+    ok("租借后该位置人数 +1", t1.players[pos].length === n0 + 1, `${n0} → ${t1.players[pos].length}`);
+    ok("扣了租借费", t1.money === money0 - fee, `${money0} → ${t1.money}（费 ${fee}）`);
+    ok("对方收到租借费", c.fromTeam.money >= 200);
+    ok("计次 = 1", S().loansUsed === 1, S().loansUsed);
+    ok("租借列表有 1 条", (S().loans || []).length === 1);
+    ok("租借球员带 loan 标记", t1.players[pos].some(p => p.loan && p.name === c.p.name));
+    ok("再租被次数限制拦下", T.loanBlocker(T.loanCandidates()[0]) === "本赛季租借次数已用完", T.loanBlocker(T.loanCandidates()[0]));
+
+    // 「剩余 N 轮」要跟着 tick 递减（旧版永远显示 3）
+    T.loanTick();
+    ok("1 轮后记录剩余 2 轮", S().loans[0] && S().loans[0].roundsLeft === 2, S().loans[0] && S().loans[0].roundsLeft);
+    T.loanTick(); T.loanTick();
+    ok("3 轮后自动返回", (S().loans || []).length === 0, (S().loans || []).length);
+    ok("返回后人数复原", T.getMyTeam().players[pos].length === n0, T.getMyTeam().players[pos].length);
+
+    // 打第一场常规赛 → 窗口关闭 → 租借必须不可用
+    S().transferWindow = false;
+    const closed = T.loanBlocker(T.loanCandidates()[0]);
+    ok("窗口关闭后不可租借", /转会窗口开放期间/.test(closed || ""), closed);
+    const n2 = T.getMyTeam().players[pos].length, m2 = T.getMyTeam().money, u2 = S().loansUsed;
+    T.loanSign(0);                                   // 动作侧也要拦住
+    ok("窗口关闭时点租借无副作用",
+      T.getMyTeam().players[pos].length === n2 && T.getMyTeam().money === m2 && S().loansUsed === u2);
+    S().tab = "market"; S().market = null; T.handleAct("tab:market");
+    const htmlClosed = root();
+    const btnsClosed = (htmlClosed.match(/<button[^>]*data-act="loanin:[^"]*"[^>]*>/g) || []);
+    ok("区块提示窗口已关闭", htmlClosed.indexOf("租借窗口已关闭") >= 0);
+    ok("窗口关闭时租借按钮全部禁用", btnsClosed.length > 0 && btnsClosed.every(b => b.indexOf("disabled") >= 0), btnsClosed.length);
+
+    // 下赛季初重新开放（次数也随赛季重置）
+    S().transferWindow = true; S().loansUsed = 0;
+    ok("下赛季初重新可租", T.loanBlocker(null) === null);
+  });
 };

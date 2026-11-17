@@ -1695,7 +1695,7 @@ function agePlayers() {
   })));
   return { tick, aged };
 }
-/* ---------------- 赛中租借（转会窗关闭后仍可短期补强） ---------------- */
+/* ---------------- 赛季初租借（与转会买卖同一个窗口：每赛季初开放） ---------------- */
 function loanCandidates() {
   const out = [];
   S.teams.forEach(o => {
@@ -1707,38 +1707,62 @@ function loanCandidates() {
   });
   return out.sort((a, b) => b.p.ovr - a.p.ovr).slice(0, 8);
 }
+/* 租借是否可用的唯一判定（UI 的按钮禁用与动作侧校验共用，避免两边规则不一致） */
+function loanBlocker(c) {
+  if (!S || !S.transferWindow) return "租借只在每赛季初的转会窗口开放期间可用（打第一场常规赛后关闭）";
+  if ((S.loansUsed || 0) >= (S.maxLoans || 1)) return "本赛季租借次数已用完";
+  if (c) {
+    const t = getMyTeam();
+    if (!t) return "战队数据异常";
+    if ((t.players[c.pos] || []).length >= 4) return `${POS_NAME[c.pos]} 人数已满（4 人）`;
+    const fee = Math.round(priceFor(c.p.ovr) * 0.25);
+    if (t.money < fee) return `资金不足：租借费 ¥${fee}万`;
+  }
+  return null;
+}
+function loanFee(c) { return Math.round(priceFor(c.p.ovr) * 0.25); }
 function loanSign(key) {
-  const t = getMyTeam();
-  if ((S.loansUsed || 0) >= (S.maxLoans || 1)) { toast("本赛季租借次数已用完"); return; }
-  if (S.transferWindow) { toast("转会窗口开放期间不需要租借，可直接签约"); return; }
-  const cands = loanCandidates();
-  const c = cands[parseInt(key, 10)];
+  const list = loanCandidates();
+  // 用选手 id 定位（旧版用数组下标，而候选数组每次重建、indexOf 恒为 -1，按钮点了必然"目标已不可用"）
+  let c = list.find(x => String(x.p.id) === String(key));
+  if (!c) c = list[parseInt(key, 10)];      // 兼容旧的下标传参
   if (!c) { toast("该租借目标已不可用"); return; }
-  if (t.players[c.pos].length >= 4) { toast(`${POS_NAME[c.pos]} 人数已满`); return; }
-  const fee = Math.round(priceFor(c.p.ovr) * 0.25);
-  if (t.money < fee) { toast(`资金不足：租借费 ¥${fee}万`); return; }
+  const blocker = loanBlocker(c);
+  if (blocker) { toast(blocker); return; }
+  const t = getMyTeam();
+  const fee = loanFee(c);
   confirmDialog({
-    title: "赛中租借",
+    title: "赛季初租借",
     body: `从 <b>${escapeHtml(c.fromTeam.name)}</b> 租借 ${POS_NAME[c.pos]}【<b>${escapeHtml(c.p.name)}</b>】（总评 ${c.p.ovr}）。<br>租借费 <b style="color:var(--gold)">¥${fee}万</b>，期限 <b>3 轮</b>，到期自动返回原队。<br>本赛季剩余租借次数：${(S.maxLoans || 1) - (S.loansUsed || 0)} 次。`,
     okText: "确认租借"
   }).then(ok => {
     if (!ok) return;
-    if (t.money < fee) { toast("资金不足"); return; }
-    snapshot(`租借 ${c.p.name}`);
-    const idx = c.fromTeam.players[c.pos].findIndex(x => x.id === c.p.id);
-    if (idx === -1) { toast("该选手已被其他队签走"); render(); return; }
-    const moved = c.fromTeam.players[c.pos].splice(idx, 1)[0];
-    moved.loan = { fromTeamId: c.fromTeam.id, roundsLeft: 3, origId: moved.id };
-    if (c.fromTeam.players[c.pos].length === 0) c.fromTeam.players[c.pos].push(takeFreeAgent(c.pos));
-    initLineup(c.fromTeam);
-    t.players[c.pos].push(moved);
-    t.money -= fee; c.fromTeam.money += fee;
-    S.loansUsed = (S.loansUsed || 0) + 1;
-    S.loans.push({ name: moved.name, pos: c.pos, fromTeamId: c.fromTeam.id, roundsLeft: 3 });
-    S.log.unshift(`S${S.season} 租借：从 ${c.fromTeam.name} 租入 ${moved.name}（¥${fee}万 / 3轮）`);
-    toast(`租入【${moved.name}】（3 轮后自动返回）`);
-    save(); render();
+    const late = loanBlocker(c);
+    if (late) { toast(late); render(); return; }   // 点确认的这段时间里窗口可能已经关了 / 次数用掉 / 资金变动
+    applyLoan(c);
   });
+}
+/* 真正执行租借（扣费 + 双向转会 + 记账）。单独抽出来，方便复用与测试 */
+function applyLoan(c) {
+  const t = getMyTeam();
+  if (!t || !c) return false;
+  const fee = loanFee(c);
+  const idx = c.fromTeam.players[c.pos].findIndex(x => x.id === c.p.id);
+  if (idx === -1) { toast("该选手已被其他队签走"); render(); return false; }
+  snapshot(`租借 ${c.p.name}`);
+  const moved = c.fromTeam.players[c.pos].splice(idx, 1)[0];
+  moved.loan = { fromTeamId: c.fromTeam.id, roundsLeft: 3, origId: moved.id };
+  if (c.fromTeam.players[c.pos].length === 0) c.fromTeam.players[c.pos].push(takeFreeAgent(c.pos));
+  initLineup(c.fromTeam);
+  t.players[c.pos].push(moved);
+  t.money -= fee; c.fromTeam.money += fee;
+  S.loansUsed = (S.loansUsed || 0) + 1;
+  S.loans = S.loans || [];
+  S.loans.push({ name: moved.name, pos: c.pos, fromTeamId: c.fromTeam.id, roundsLeft: 3 });
+  S.log.unshift(`S${S.season} 租借：从 ${c.fromTeam.name} 租入 ${moved.name}（¥${fee}万 / 3轮）`);
+  toast(`租入【${moved.name}】（3 轮后自动返回）`);
+  save(); render();
+  return true;
 }
 function loanTick() {
   const t = getMyTeam();
@@ -1747,6 +1771,9 @@ function loanTick() {
   POS.forEach(pos => t.players[pos].slice().forEach(p => {
     if (!p.loan) return;
     p.loan.roundsLeft--;
+    // 面板上的「剩余 N 轮」读的是 S.loans 里的记录，这里必须同步，否则永远显示 3
+    const rec = (S.loans || []).find(l => l.name === p.name && l.pos === pos);
+    if (rec) rec.roundsLeft = p.loan.roundsLeft;
     if (p.loan.roundsLeft > 0) return;
     const idx = t.players[pos].findIndex(x => x.id === p.id);
     if (idx !== -1) t.players[pos].splice(idx, 1);
