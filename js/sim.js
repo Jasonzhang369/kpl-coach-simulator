@@ -259,6 +259,7 @@ function newGame(opts) {
     market: null, freeAgents: leftover,
     transfersUsed: 0, maxTransfers: 3,
     loansUsed: 0, maxLoans: 1, loans: [],
+    scout: { heroes: {} },          // 球探档案：AI 记住玩家的 BP 偏好（跨赛季衰减）
     transferWindow: true, aiTransfers: [], transferSeen: 0,
     staff: { mental: 0, fitness: 0, analyst: 0 },
     kpi: null, kpiResult: null,
@@ -656,6 +657,56 @@ function currentStep() {
 }
 function currentActor() { const st = currentStep(); return st ? st.actor : null; }
 /* 我值多少分（用于 AI 判断该 ban 谁）：我在哪个分路拿到这个英雄最赚 */
+/* ---------------- 球探档案：AI 记住玩家的 BP 偏好 ----------------
+   跨系列赛累积（新赛季衰减一半），用于 ban 的针对性、以及选将时预判你的克制应手。
+   只记「玩家真正选过/用过的英雄」和胜负，不存任何局外信息。 */
+function scoutInit() {
+  if (!S.scout || typeof S.scout !== "object") S.scout = { heroes: {} };
+  if (!S.scout.heroes) S.scout.heroes = {};
+  return S.scout;
+}
+function scoutOf(name) {
+  const sc = scoutInit();
+  return sc.heroes[name] || { pick: 0, win: 0 };
+}
+function scoutRecord(heroNames, win) {
+  const sc = scoutInit();
+  (heroNames || []).forEach(nm => {
+    if (!nm || nm === "—") return;
+    const r = sc.heroes[nm] || (sc.heroes[nm] = { pick: 0, win: 0 });
+    r.pick++; if (win) r.win++;
+  });
+}
+/* 偏好加成：选得越多、赢得越多，AI 越会针对（上限 +38%） */
+function scoutBias(name) {
+  const r = scoutOf(name);
+  if (!r.pick) return 1;
+  const freq = Math.min(0.22, r.pick * 0.035);
+  const wr = r.pick >= 2 ? clamp((r.win / r.pick - 0.5) * 0.32, -0.10, 0.16) : 0;
+  return 1 + freq + wr;
+}
+function scoutDecay() {
+  const sc = scoutInit();
+  Object.keys(sc.heroes).forEach(k => {
+    const r = sc.heroes[k];
+    r.pick = Math.round(r.pick * 0.5);
+    r.win = Math.round(r.win * 0.5);
+    if (!r.pick) delete sc.heroes[k];
+  });
+}
+/* 玩家最可能拿来克制我这一手的价值（用于选将时预判） */
+function myBestResponseRisk(myHero) {
+  if (!myHero) return 0;
+  if (!S.series || !S.series.draft) return 0;
+  const pool = availBanHeroes(false);          // 对 AI 而言，玩家可用的池
+  if (!pool.length) return 0;
+  let worst = 1;
+  pool.slice(0, 40).forEach(oh => {
+    const m = matchupMult(oh, myHero);
+    if (m > worst) worst = m;
+  });
+  return clamp((worst - 1) / 0.20, 0, 1);      // 0=没人克得动，1=被强克
+}
 function myThreatScore(h) {
   const my = getMyTeam();
   if (!my || !h) return 0;
@@ -667,7 +718,7 @@ function myThreatScore(h) {
     const sc = heroStrength(h) * prof * laneFit(h, pos) * (POS_WEIGHT[pos] || 1);
     if (sc > best) best = sc;
   });
-  return best;
+  return best * scoutBias(h.name);     // 你越常用、越赢，威胁分越高（会被优先 ban）
 }
 // AI 的 ban：难度决定「是否读我的英雄池 / 是否针对我的核心」
 //  新秀：约一半回合根本不看我会什么，只按当前版本强度 ban；另一半才看威胁，且候选范围很宽
@@ -771,6 +822,12 @@ function aiPickTurn(st) {
     sc *= 1 + (prof - 1) * cfg.profW;          // 选手擅长（新秀权重低）
     sc *= 1 + (counter - 1) * cfg.counterW;    // 克制对手（新秀基本不读）
     sc *= (per.pos[bl.pos] || 1) * (per.arc[bl.h.arc] || 1);   // 战术人格：软偏好
+    if (cfg.compAware) {
+      // 球探：你越常用越赢的英雄，AI 越想先抢走（抢你的招牌）；新秀不做这件事
+      sc *= 1 + 0.06 * clamp((scoutBias(h.name) - 1) / 0.30, 0, 1);
+      // 预判：选完这一手会不会被玩家拿最佳克制反制（1 层 lookahead）
+      sc *= 1 - 0.08 * myBestResponseRisk(bl.h);
+    }
     if (cfg.compAware) sc *= aiCompFactor(d, side, h, bl.pos);
     sc *= 1 + cfg.noise * (rand() * 2 - 1);    // 判断噪声 = 失误率
     return { hero: h, sc };
@@ -1040,6 +1097,8 @@ function skipBattle() {
 function commitGame(b) {
   const s = S.series;
   if (b.myWin) s.myScore++; else s.opScore++;
+  // 球探档案：记下玩家这一局用了哪些英雄、赢没赢（供后续 AI 针对性 ban/抢）
+  try { scoutRecord(POS.map(p => b.myPicks[p]), b.myWin); } catch (e) {}
   s.games.push({
     mySide: b.mySide, myPicks: b.myPicks, oppPicks: b.oppPicks, winner: b.myWin ? "me" : "opp",
     posDetail: b.posDetail, myTotal: b.myTotal, oppTotal: b.oppTotal, combos: b.combos, oppCombos: b.oppCombos,
@@ -1487,6 +1546,7 @@ function newSeason() {
   S.loans = []; S.loansUsed = 0;   // 租借赛季重置
   // 赛季初转会窗口：AI 战队先行动，随后弹出通知
   S.transferWindow = true; S.transferSeen = 0; S.aiTransfers = [];
+  try { scoutDecay(); } catch (e) {}   // 球探记忆每赛季衰减一半：版本/阵容会变
   runAiTransferWindow(S.season);
   buildMarket();      // 赛季初自动刷新转会市场（赛季内不变）
   S.series = null; S.bracket = null; S.pendingPlayoff = null; S.event = null;

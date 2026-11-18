@@ -1142,6 +1142,7 @@ function load(n) {
     if (!S.contractNotices) S.contractNotices = [];
     if (!S.staff) S.staff = { mental: 0, fitness: 0, analyst: 0 };
     if (!S.kpi) S.kpi = makeKpi();
+    scoutInit();                    // 球探档案（旧存档补默认结构）
     if (S.undo === undefined) S.undo = null;
     // 旧存档：补齐 AI 战队的资金/声望字段（与玩家同规则的经济体系）
     (S.teams || []).forEach(tm => {

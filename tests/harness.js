@@ -73,6 +73,7 @@ globalThis.__T = {
   HEROES, HERO_TRAITS, heroTraitMult, heroTraitNote, ANTI_CC_THRESHOLD, pickHeroes,
   HERO_FORMS, heroInPos, heroFormOf, heroHasForms, heroFormLabel, heroFormList, heroFormForPos, pickEntry, posPower, evaluateComp,
   heroBestLane, beginAssign, autoAssignSide, assignLane, unassigned, finishDraft, draftPick, filledPos,
+  myThreatScore, scoutInit, scoutOf, scoutRecord, scoutBias, scoutDecay, myBestResponseRisk, aiBanHero,
   standingsSorted, teamGameStats, rotationSuggest, applyRotation, restTeam,
   oppThreatHeroes, loanCandidates, loanSign, loanBlocker, loanFee, applyLoan, LOAN_GAMES,
   markLoanAppearances, settleLoanSeries, returnLoanedPlayer, returnAllLoans, agePlayers, settleContracts,

@@ -541,4 +541,60 @@ module.exports = function (env, H) {
       ok("ban 掉后选将池不再有元流之子", !T.availPickHeroes(dNow.mySide).some(x => x.name === "元流之子"));
     } else { ok("ban 掉后选将池不再有元流之子", true); }
   });
+
+  /* 球探：AI 记住玩家的 BP 偏好 → 针对性 ban / 抢招牌 / 预判克制 */
+  suite("球探记忆与 AI 针对性", () => {
+    H.newGame(env, { difficulty: "职业" });
+    const S0 = T.getS(); S0.transferWindow = false;
+    ok("新档有球探档案", !!S0.scout && typeof S0.scout.heroes === "object");
+
+    const before = T.scoutOf("吕布").pick;
+    T.scoutRecord(["吕布", "澜"], true);
+    T.scoutRecord(["吕布"], false);
+    ok("记录选取次数", T.scoutOf("吕布").pick === before + 2, T.scoutOf("吕布").pick);
+    ok("记录胜场", T.scoutOf("吕布").win === 1, T.scoutOf("吕布").win);
+
+    const b0 = T.scoutBias("吕布");
+    ok("选得越多偏好越高", b0 > 1, b0.toFixed(3));
+    S0.scout.heroes["吕布"] = { pick: 10, win: 9 };
+    ok("胜率也加权", T.scoutBias("吕布") > b0, `${b0.toFixed(3)} → ${T.scoutBias("吕布").toFixed(3)}`);
+
+    // 威胁分被记忆抬高（AI ban 池按它排序）
+    const lvbu = T.heroByName("吕布");
+    S0.scout.heroes = {};                       // 先清空，取真正的基线
+    const t0 = T.myThreatScore(lvbu);
+    S0.scout.heroes["吕布"] = { pick: 12, win: 10 };
+    const t1 = T.myThreatScore(lvbu);
+    ok("威胁分被记忆抬高 >15%", t1 > t0 * 1.15, `${t0.toFixed(1)} → ${t1.toFixed(1)}`);
+
+    // 新赛季衰减一半
+    T.scoutDecay();
+    ok("记忆逐赛季衰减", T.scoutOf("吕布").pick === 6, T.scoutOf("吕布").pick);
+
+    // 传奇难度：有记忆时优先 ban 你的招牌
+    T.newGame({ difficulty: "传奇", rosterMode: "draft", teamName: "成都AG超玩会", slot: 1 });
+    const S1 = T.getS(); S1.transferWindow = false;
+    T.startSeries(S1.schedule[0].oppId, 5, "regular", null, "测球探");
+    const d = S1.series.draft;
+    const my = T.getMyTeam();
+    const names = [...new Set(T.POS.flatMap(p => my.players[p].flatMap(x => x.heroPool)))];
+    const scored = names.map(n => ({ n, sc: T.myThreatScore(T.heroByName(n)) })).sort((a, b) => b.sc - a.sc);
+    const target = scored[3].n;                    // 平时排第 4 的招牌，本来不会被优先 ban
+    const rate = () => {
+      let hit = 0;
+      for (let i = 0; i < 80; i++) { d.bans = { blue: [], red: [] }; d.used = []; if (T.aiBanHero() === target) hit++; }
+      return hit / 80;
+    };
+    const r0 = rate();
+    S1.scout.heroes[target] = { pick: 12, win: 10 };
+    const r1 = rate();
+    ok("记忆让传奇优先 ban 你的招牌", r1 > r0 + 0.3, `${(r0 * 100).toFixed(0)}% → ${(r1 * 100).toFixed(0)}%`);
+
+    // 1 层 lookahead：被强克的英雄风险更高
+    d.bans = { blue: [], red: [] }; d.used = [];
+    const risky = T.myBestResponseRisk(T.heroByName("后羿"));
+    const safe = T.myBestResponseRisk(T.heroByName("张良"));
+    ok("被克英雄的应对风险更高", risky > safe, `${risky.toFixed(2)} vs ${safe.toFixed(2)}`);
+    ok("风险值归一在 0~1", risky >= 0 && risky <= 1 && safe >= 0 && safe <= 1);
+  });
 };

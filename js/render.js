@@ -1015,12 +1015,26 @@ function autoBp() {
 }
 
 /* ---------------- 系列赛页面 ---------------- */
+/* 球探提示：让玩家看得见「AI 记住了你的招牌」——这既是压力，也是改动可见的证据 */
+function scoutHintHtml() {
+  const sc = (S && S.scout && S.scout.heroes) || {};
+  const list = Object.entries(sc)
+    .filter(([, v]) => v && v.pick >= 2)
+    .sort((a, b) => b[1].pick - a[1].pick)
+    .slice(0, 3);
+  if (!list.length) return "";
+  let lvl = "职业";
+  try { lvl = aiBpLevel(); } catch (e) {}
+  if (lvl === "新秀") return "";   // 新秀不读球探
+  return `<div class="center" style="font-size:11.5px;color:var(--txt2);margin-bottom:6px">🕵 对手球探（${escapeHtml(lvl)}）：已记录你的招牌 ${list.map(([n, v]) => `<b style="color:var(--gold)">${escapeHtml(n)}</b>（${v.pick} 次 · ${Math.round(v.win / v.pick * 100)}% 胜）`).join("、")} —— 会被优先 ban 或先抢</div>`;
+}
 function renderSeries() {
   const s = S.series, d = s.draft;
   const myT = getMyTeam(), opp = S.teams.find(t => t.id === s.oppId);
   const head = `${renderTopbar()}<div class="card">
     <div class="section-title">${escapeHtml(s.label)} — ${escapeHtml(myT.name)} vs ${escapeHtml(opp.name)} · BO${s.bestOf}</div>
     <div class="center muted" style="font-size:12px;margin-bottom:4px">对手 BP 水平：<b style="color:var(--gold)">${escapeHtml(aiBpLabel())}</b>${S.rosterMode === "real" ? "（真实大名单固定按传奇）" : "（由难度决定，不改战力）"} · 风格：<b style="color:var(--cyan)">${escapeHtml(personaOf(opp).name)}</b> <span title="${escapeHtml(personaOf(opp).desc)}">ⓘ</span></div>
+    ${scoutHintHtml()}
     <div class="score-big" style="font-size:30px"><span class="w">${s.myScore}</span> : <span class="l">${s.opScore}</span></div>
     ${d && d.peak
       ? `<div class="center peak-banner" style="margin-bottom:10px"><b>⚡ 第 7 局 · 巅峰对决</b> · 无 ban 位 · 双方盲选 · 不受全局BP限制（此前用过的英雄仍可选）· 双方可选到相同英雄</div>`
