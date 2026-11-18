@@ -467,9 +467,11 @@ module.exports = function (env, H) {
     // 形态决定"本命分路"：放对 1.00，放错按逆用 0.72
     ok("坦克形态放对抗路 = 本命", T.laneFit(T.heroInPos(ud, "top", "tank"), "top") === 1);
     ok("坦克形态放中路 = 逆用", T.laneFit(T.heroInPos(ud, "mid", "tank"), "mid") < 0.8, T.laneFit(T.heroInPos(ud, "mid", "tank"), "mid"));
-    // 元坦打野是主流：坦克形态自带打野摇摆 0.95
-    ok("坦克形态可打野 0.95", Math.abs(T.laneFit(T.heroInPos(ud, "jungle", "tank"), "jungle") - 0.95) < 1e-9,
+    // 元坦打野就是主场：坦克形态打野 1.00
+    ok("坦克形态打野 = 主场 1.0", T.laneFit(T.heroInPos(ud, "jungle", "tank"), "jungle") === 1,
       T.laneFit(T.heroInPos(ud, "jungle", "tank"), "jungle"));
+    ok("坦克形态打野显示「主场」", T.fitLabel(T.laneFit(T.heroInPos(ud, "jungle", "tank"), "jungle")) === "✓ 主场",
+      T.fitLabel(T.laneFit(T.heroInPos(ud, "jungle", "tank"), "jungle")));
     ok("刺客形态可摇对抗路 0.88", Math.abs(T.laneFit(T.heroInPos(ud, "top", "assassin"), "top") - 0.88) < 1e-9,
       T.laneFit(T.heroInPos(ud, "top", "assassin"), "top"));
     ok("默认按分路取同名形态", T.heroInPos(ud, "jungle").formKey === "assassin" && T.heroInPos(ud, "jungle").arc === "assassin");

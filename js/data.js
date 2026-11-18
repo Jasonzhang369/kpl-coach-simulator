@@ -252,8 +252,8 @@ function heroTraitNote(hero, oppHero) {
 const HERO_FORMS = {
   元流之子: {
     mage:     { arc: "mage",     o: 82, s: 50, c: 62, m: 58, label: "法师形态", pos: "mid", flex: {} },
-    // 元坦打野是赛事主流，所以坦克形态额外给一条打野摇摆
-    tank:     { arc: "tank",     o: 58, s: 90, c: 72, m: 52, label: "坦克形态", pos: "top", flex: { jungle: 0.95 } },
+    // 元坦打野就是主场（和对抗路同档 1.0），不是摇摆
+    tank:     { arc: "tank",     o: 58, s: 90, c: 72, m: 52, label: "坦克形态", pos: "top", flex: { jungle: 1.0 } },
     marksman: { arc: "marksman", o: 84, s: 48, c: 55, m: 62, label: "射手形态", pos: "bot", flex: {} },
     support:  { arc: "support",  o: 54, s: 76, c: 84, m: 62, label: "辅助形态", pos: "support", flex: {} },
     assassin: { arc: "assassin", o: 86, s: 58, c: 45, m: 84, label: "刺客形态", pos: "jungle", flex: { top: 0.88 } }

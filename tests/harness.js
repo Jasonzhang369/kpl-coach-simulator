@@ -69,7 +69,7 @@ globalThis.__T = {
   handleAct, startSeries, startMatch, newGameDraft, autoBpStep, autoBp, autoBpAllowed,
   battleTick, finishBattle, simGame, commitGame, seriesContinue, newSeason, advanceRegular,
   myAutoPick, myAutoBan, myPeakAutoPick, aiBanHero, aiPickTurn, aiBpLevel, aiBpCfg,
-  getMyTeam, teamPower, heroByName, heroStrength, laneFit, matchupMult,
+  getMyTeam, teamPower, heroByName, heroStrength, laneFit, fitLabel, matchupMult,
   HEROES, HERO_TRAITS, heroTraitMult, heroTraitNote, ANTI_CC_THRESHOLD, pickHeroes,
   HERO_FORMS, heroInPos, heroFormOf, heroHasForms, heroFormLabel, heroFormList, heroFormForPos, pickEntry, posPower, evaluateComp,
   standingsSorted, teamGameStats, rotationSuggest, applyRotation, restTeam,
