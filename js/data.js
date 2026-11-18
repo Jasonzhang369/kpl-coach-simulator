@@ -358,21 +358,21 @@ const TEAMS = [
 const POOL = [
   // ===== 对抗路 =====
   { name: "Fly", pos: "top", rating: "S", ovr: 94 },      // 4×FMVP（2017春/秋、2023春）
-  { name: "轩染", pos: "top", rating: "S", ovr: 89 },     // AG 六连冠主力，2025夏 FMVP
-  { name: "清清", pos: "top", rating: "S", ovr: 88 },     // TTG 2023夏冠军 FMVP
+  { name: "轩染", pos: "top", rating: "S", ovr: 91 },  // AG 六连冠边路，2025夏FMVP候选
+  { name: "清清", pos: "top", rating: "S", ovr: 89 },  // 2026春/夏双亚，狼队边路
   { name: "坦然", pos: "top", rating: "A", ovr: 87 },     // eStar 2021秋/2022春冠军，2022春 FMVP
-  { name: "梓墨", pos: "top", rating: "A", ovr: 86 },
+  { name: "梓墨", pos: "top", rating: "S", ovr: 91 },  // 2026年总FMVP
   { name: "归期", pos: "top", rating: "A", ovr: 85 },
   { name: "花缘", pos: "top", rating: "A", ovr: 85 },
   { name: "小落", pos: "top", rating: "A", ovr: 84 },
   { name: "六点六", pos: "top", rating: "A", ovr: 83 },   // QG 双冠边路
   { name: "Djie", pos: "top", rating: "A", ovr: 83 },     // RW 侠，2018-19 最佳阵容一阵
-  { name: "萝卜", pos: "top", rating: "A", ovr: 82 },
-  { name: "流星", pos: "top", rating: "A", ovr: 82 },
-  { name: "轻语", pos: "top", rating: "B", ovr: 81 },
-  { name: "小泽", pos: "top", rating: "B", ovr: 81 },
+  { name: "萝卜", pos: "top", rating: "A", ovr: 85 },  // 2026夏冠军边路
+  { name: "流星", pos: "top", rating: "A", ovr: 83 },  // EDG.M 边路
+  { name: "轻语", pos: "top", rating: "A", ovr: 83 },  // 2026年总亚军JDG边路
+  { name: "小泽", pos: "top", rating: "A", ovr: 83 },  // 2026夏冠军阵容
   { name: "无痕", pos: "top", rating: "B", ovr: 80 },     // AG 早期主力边路
-  { name: "樱花", pos: "top", rating: "B", ovr: 80 },
+  { name: "樱花", pos: "top", rating: "A", ovr: 82 },  // 2026年总冠军阵容
   { name: "小困", pos: "top", rating: "B", ovr: 79 },
   { name: "冷轩", pos: "top", rating: "B", ovr: 79 },
   { name: "北诗", pos: "top", rating: "B", ovr: 78 },
@@ -387,17 +387,19 @@ const POOL = [
   { name: "栋栋", pos: "top", rating: "B", ovr: 75 },     // 南京Hero久竞
   { name: "恒心", pos: "top", rating: "C", ovr: 73 },
   { name: "风行", pos: "top", rating: "C", ovr: 72 },
+  { name: "光明", pos: "top", rating: "A", ovr: 83 },  // 2026夏最佳对抗路候选（北京JDG）
+  { name: "文涛", pos: "top", rating: "B", ovr: 76 },   // 重庆狼队 边路
 
   // ===== 打野 =====
-  { name: "小胖", pos: "jungle", rating: "S", ovr: 92 },   // 3×FMVP（2022夏、2024春、2026夏）
+  { name: "小胖", pos: "jungle", rating: "S", ovr: 94 },  // 2026夏决FMVP，史上首位代表不同俱乐部拿决赛MVP
   { name: "花海", pos: "jungle", rating: "S", ovr: 91 },   // eStar 冠军打野，2021秋 FMVP
-  { name: "钟意", pos: "jungle", rating: "S", ovr: 90 },   // AG 双冠，2024夏/2025春 FMVP
-  { name: "暖阳", pos: "jungle", rating: "S", ovr: 89 },   // 2020春冠军，打野首位 FMVP
-  { name: "今屿", pos: "jungle", rating: "A", ovr: 86 },
+  { name: "钟意", pos: "jungle", rating: "S", ovr: 91 },  // AG 六连冠打野
+  { name: "暖阳", pos: "jungle", rating: "S", ovr: 90 },  // 2026年总冠军打野，2020年度记忆人物
+  { name: "今屿", pos: "jungle", rating: "A", ovr: 87 },  // 2026年总亚军JDG打野
   { name: "Alan", pos: "jungle", rating: "A", ovr: 85 },   // eStar 2019 冠军打野
-  { name: "皖皖", pos: "jungle", rating: "A", ovr: 85 },
-  { name: "佳心", pos: "jungle", rating: "A", ovr: 84 },
-  { name: "句号", pos: "jungle", rating: "A", ovr: 84 },
+  { name: "皖皖", pos: "jungle", rating: "A", ovr: 86 },  // 2026夏亚打野
+  { name: "佳心", pos: "jungle", rating: "A", ovr: 86 },  // 2026夏冠军打野轮换
+  { name: "句号", pos: "jungle", rating: "A", ovr: 87 },  // 2026春冠军打野（猪八戒/大司命）
   { name: "小白熊", pos: "jungle", rating: "A", ovr: 83 },
   { name: "初晨", pos: "jungle", rating: "A", ovr: 83 },
   { name: "小楼", pos: "jungle", rating: "A", ovr: 82 },
@@ -414,20 +416,24 @@ const POOL = [
   { name: "神人", pos: "jungle", rating: "B", ovr: 77 },   // 佛山 GK 打野
   { name: "嘉宝", pos: "jungle", rating: "B", ovr: 77 },
   { name: "安七", pos: "jungle", rating: "C", ovr: 74 },
+  { name: "书源", pos: "jungle", rating: "A", ovr: 83 },  // 2026夏最佳打野候选（长沙TES.A）
+  { name: "米苏", pos: "jungle", rating: "B", ovr: 77 },  // 杭州LGD.NBW 打野
+  { name: "果冻", pos: "jungle", rating: "B", ovr: 76 },  // 北京WB 打野轮换
+  { name: "航航", pos: "jungle", rating: "B", ovr: 76 },   // 上海RNG.M 打野
 
   // ===== 中路 =====
-  { name: "清融", pos: "mid", rating: "S", ovr: 91 },      // Hero 2021春冠军 FMVP，多冠
-  { name: "长生", pos: "mid", rating: "S", ovr: 90 },      // AG，2024年总 FMVP
+  { name: "清融", pos: "mid", rating: "S", ovr: 92 },  // 2026年总亚军JDG核心，十大年度记忆人物
+  { name: "长生", pos: "mid", rating: "S", ovr: 91 },  // AG 六连冠中单
   { name: "久诚", pos: "mid", rating: "S", ovr: 90 },      // Hero 2018 双冠双 FMVP
   { name: "Cat", pos: "mid", rating: "S", ovr: 89 },       // 猫神，2019春冠军 FMVP
-  { name: "流浪", pos: "mid", rating: "S", ovr: 88 },      // KSG，2026春 FMVP
+  { name: "流浪", pos: "mid", rating: "S", ovr: 92 },  // 2026春决FMVP，KSG 队史首冠
   { name: "九尾", pos: "mid", rating: "A", ovr: 86 },
-  { name: "紫幻", pos: "mid", rating: "A", ovr: 85 },
-  { name: "听悦", pos: "mid", rating: "A", ovr: 84 },
+  { name: "紫幻", pos: "mid", rating: "A", ovr: 86 },  // 2026夏亚中单
+  { name: "听悦", pos: "mid", rating: "S", ovr: 88 },  // 2026年总冠军中单
   { name: "早点", pos: "mid", rating: "A", ovr: 84 },
   { name: "Ming", pos: "mid", rating: "A", ovr: 84 },
-  { name: "鹤辞", pos: "mid", rating: "A", ovr: 83 },
-  { name: "花卷", pos: "mid", rating: "A", ovr: 83 },
+  { name: "鹤辞", pos: "mid", rating: "A", ovr: 86 },  // 2026夏冠军中单
+  { name: "花卷", pos: "mid", rating: "A", ovr: 84 },  // EDG.M 中单
   { name: "暴风锐", pos: "mid", rating: "A", ovr: 82 },    // RNG.M
   { name: "Mojo", pos: "mid", rating: "A", ovr: 82 },      // QGhappy
   { name: "小名", pos: "mid", rating: "B", ovr: 81 },
@@ -437,7 +443,7 @@ const POOL = [
   { name: "小优", pos: "mid", rating: "B", ovr: 79 },
   { name: "雨空", pos: "mid", rating: "B", ovr: 78 },
   { name: "旭旭", pos: "mid", rating: "B", ovr: 78 },
-  { name: "小凡", pos: "mid", rating: "B", ovr: 78 },
+  { name: "小凡", pos: "mid", rating: "B", ovr: 80 },  // KSG 中路轮换
   { name: "千世", pos: "mid", rating: "B", ovr: 77 },
   { name: "辰鬼", pos: "mid", rating: "B", ovr: 77 },      // 2016秋初代 FMVP
   { name: "橘子", pos: "mid", rating: "B", ovr: 77 },      // eStar 2019 冠军阵容
@@ -447,27 +453,29 @@ const POOL = [
   { name: "许诺", pos: "mid", rating: "C", ovr: 74 },
   { name: "老帅", pos: "mid", rating: "C", ovr: 74 },      // AG 首冠成员（现已淡出）
   { name: "冰尘", pos: "mid", rating: "C", ovr: 73 },
+  { name: "七", pos: "mid", rating: "A", ovr: 82 },  // 2026夏最佳中路候选（长沙TES.A）
+  { name: "向鱼", pos: "mid", rating: "B", ovr: 78 },   // 中路老将
 
   // ===== 发育路 =====
-  { name: "一诺", pos: "bot", rating: "S", ovr: 93 },      // AG，2019秋/2025年总 FMVP，六连冠核心
+  { name: "一诺", pos: "bot", rating: "S", ovr: 95 },  // 7冠 + 2025年总FMVP（戈娅）
   { name: "妖刀", pos: "bot", rating: "A", ovr: 87 },
   { name: "梦岚", pos: "bot", rating: "A", ovr: 86 },
-  { name: "道崽", pos: "bot", rating: "A", ovr: 86 },
+  { name: "道崽", pos: "bot", rating: "A", ovr: 87 },  // 2026夏亚核心，多次单局MVP
   { name: "易峥", pos: "bot", rating: "A", ovr: 86 },      // eStar 2021-22 冠军射手
   { name: "小义", pos: "bot", rating: "A", ovr: 85 },      // DYG，2020秋 FMVP
   { name: "小俞", pos: "bot", rating: "A", ovr: 83 },
-  { name: "绝意", pos: "bot", rating: "A", ovr: 83 },
-  { name: "凌云", pos: "bot", rating: "A", ovr: 82 },
+  { name: "绝意", pos: "bot", rating: "A", ovr: 84 },  // 2026 主力射手
+  { name: "凌云", pos: "bot", rating: "A", ovr: 83 },  // EDG.M 射手
   { name: "小麦", pos: "bot", rating: "B", ovr: 81 },
   { name: "乔兮", pos: "bot", rating: "B", ovr: 81 },
-  { name: "小雪", pos: "bot", rating: "B", ovr: 80 },
+  { name: "小雪", pos: "bot", rating: "A", ovr: 84 },  // 2026夏冠军射手
   { name: "小久", pos: "bot", rating: "B", ovr: 80 },
   { name: "小涵", pos: "bot", rating: "B", ovr: 79 },
   { name: "卡密望", pos: "bot", rating: "B", ovr: 79 },
   { name: "鸣鸣", pos: "bot", rating: "B", ovr: 78 },
   { name: "秋源", pos: "bot", rating: "B", ovr: 78 },
   { name: "佩恩", pos: "bot", rating: "B", ovr: 78 },
-  { name: "风箫", pos: "bot", rating: "B", ovr: 78 },
+  { name: "风箫", pos: "bot", rating: "A", ovr: 82 },  // 2026夏最佳发育路候选
   { name: "鹏鹏", pos: "bot", rating: "B", ovr: 78 },      // 佛山 GK
   { name: "零栩", pos: "bot", rating: "B", ovr: 77 },
   { name: "小玖", pos: "bot", rating: "B", ovr: 77 },      // 北京 JDG
@@ -478,19 +486,21 @@ const POOL = [
   { name: "亮宇", pos: "bot", rating: "B", ovr: 76 },
   { name: "蓝桉", pos: "bot", rating: "B", ovr: 76 },
   { name: "SILVER", pos: "bot", rating: "B", ovr: 79 },   // 南京Hero久竞（黄本帅）
-  { name: "墨衍", pos: "bot", rating: "C", ovr: 74 },     // 南京Hero久竞
+  { name: "墨衍", pos: "bot", rating: "C", ovr: 74 },  // 南京Hero久竞
+  { name: "小寒", pos: "bot", rating: "A", ovr: 84 },  // 2026夏最佳发育路候选（北京JDG）
+  { name: "钎城", pos: "bot", rating: "B", ovr: 79 },   // 发育路老将
 
   // ===== 游走（辅助） =====
-  { name: "大帅", pos: "support", rating: "S", ovr: 89 },   // AG，2025夏 FMVP
+  { name: "大帅", pos: "support", rating: "S", ovr: 92 },  // 2025夏决FMVP，史上第二位辅助FMVP
   { name: "子阳", pos: "support", rating: "S", ovr: 88 },   // eStar 冠军辅助，现 KSG 主力
   { name: "星宇", pos: "support", rating: "A", ovr: 86 },   // eStar 2021-22 冠军阵容
-  { name: "一笙", pos: "support", rating: "A", ovr: 85 },
+  { name: "一笙", pos: "support", rating: "A", ovr: 87 },  // 2026春冠军游走 + 2026年总冠军WB
   { name: "久酷", pos: "support", rating: "A", ovr: 84 },
   { name: "梦溪", pos: "support", rating: "A", ovr: 84 },
-  { name: "无畏", pos: "support", rating: "A", ovr: 84 },   // 2026春冠军 JDG
-  { name: "阿豆", pos: "support", rating: "A", ovr: 83 },
+  { name: "无畏", pos: "support", rating: "A", ovr: 86 },  // 2026年总亚军JDG游走
+  { name: "阿豆", pos: "support", rating: "A", ovr: 84 },  // 2026年总冠军阵容
   { name: "帆帆", pos: "support", rating: "A", ovr: 83 },
-  { name: "晚星", pos: "support", rating: "A", ovr: 82 },
+  { name: "晚星", pos: "support", rating: "A", ovr: 85 },  // 2026春冠军阵容
   { name: "四宝", pos: "support", rating: "A", ovr: 82 },
   { name: "玖欣", pos: "support", rating: "B", ovr: 81 },
   { name: "小崽", pos: "support", rating: "B", ovr: 81 },
@@ -510,7 +520,9 @@ const POOL = [
   { name: "易瞳", pos: "support", rating: "B", ovr: 76 },
   { name: "Zero", pos: "support", rating: "B", ovr: 75 },   // RNG.M
   { name: "涛", pos: "support", rating: "C", ovr: 74 },
-  { name: "无铭", pos: "support", rating: "C", ovr: 73 }    // eStar（现转教练）
+  { name: "无铭", pos: "support", rating: "C", ovr: 73 },  // eStar（现转教练）
+  { name: "涵", pos: "support", rating: "A", ovr: 84 },  // 2026夏冠军TTG游走，钟馗绝活
+  { name: "月月", pos: "support", rating: "B", ovr: 76 },   // 2026夏冠军TTG游走替补
 ];
 
 // 「真实难度」专用：12 支战队的真实大名单（以 2025 KPL 年度总决赛/挑战者杯/夏季赛大名单为准，
