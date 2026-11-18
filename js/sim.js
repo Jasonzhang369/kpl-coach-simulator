@@ -615,12 +615,12 @@ function myPeakAutoPick(pos) {
   return list[randInt(0, n - 1)].name;
 }
 // 揭示对手盲选并开打（双方阵容都已就绪）
-function finishPeakDraft() {
+function revealPeakPicks() {
   const s = S.series, d = s.draft;
-  d.picks[aiSide(d)] = (d.peakAi || aiPeakPicks(S.teams.find(t => t.id === s.oppId))).slice();
-  d.over = true; d.phase = "done";
-  simGame();
-}function sideName(s) { return s === "blue" ? "蓝方" : "红方"; }
+  const ai = (d.peakAi || aiPeakPicks(S.teams.find(t => t.id === s.oppId))).slice();
+  d.picks[aiSide(d)] = ai.map(x => ({ hero: x.hero, pos: null }));
+}
+function finishPeakDraft() { revealPeakPicks(); beginAssign(); }function sideName(s) { return s === "blue" ? "蓝方" : "红方"; }
 function filledPos(d, side) { return d.picks[side].map(e => e.pos); }
 /* ---------------- 全局BP：以【战队】为单位记录已用英雄（与红蓝方完全无关） ----------------
    阵营（蓝/红）每局都会互换，因此英雄归属只按 teamId 存，绝不按 side 存。
@@ -731,44 +731,55 @@ function rollPersona() {
   PERSONAS.forEach(p => { const w = p.key === "flex" ? 3 : 1; for (let i = 0; i < w; i++) pool.push(p.key); });
   return choice(pool);
 }
+/* 一个英雄「最强能站哪一路」：用于选将阶段（此时还没有分路） */
+function heroBestLane(h) {
+  let best = null;
+  POS.forEach(pos => {
+    const hL = heroInPos(h, pos);
+    const v = laneFit(hL, pos) * POS_WEIGHT[pos];
+    if (!best || v > best.v) best = { pos, h: hL, v };
+  });
+  return best || { pos: POS[0], h: h, v: 1 };
+}
 function aiPickTurn(st) {
   const s = S.series, d = s.draft, side = st.actor;
   const aiTeam = S.teams.find(t => t.id === s.oppId);
   const cfg = aiBpCfg();
   const per = personaOf(aiTeam);
-  const filled = filledPos(d, side);
-  const unfilled = POS.filter(p => !filled.includes(p));
   const pool = availPickHeroes(side);
-  const cands = [];
-  unfilled.forEach(pos => {
-    const starter = getPlayer(aiTeam, aiTeam.lineup[pos]);
-    const enemy = (d.picks[d.mySide] || []).find(e => e.pos === pos);
-    const enemyHero = enemy ? heroByName(enemy.hero) : null;
-    // 底线：AI 不会把英雄塞到明显不适合的分路（摇摆·常见及以上才考虑），
-    // 只有整个分路池都被 BP 吃光时才放宽——保证「低难度也不降智」。
-    const laneOk = pool.filter(h => laneFit(h, pos) >= LANE_PICK_FLOOR);
-    const usePool = laneOk.length ? laneOk : pool;
-    usePool.forEach(h => {
-      const hL = heroInPos(h, pos);            // 元流之子按本路形态参与打分
-      const prof = profOf(starter, h.name);
-      const fit = laneFit(hL, pos);            // 多形态英雄：按本路形态的分路算匹配度
-      const counter = enemyHero ? matchupMult(hL, heroInPos(enemyHero, pos)) : 1;
-      let sc = heroStrength(hL);
-      sc *= 1 + (prof - 1) * cfg.profW;        // 选手擅长（新秀权重低）
-      sc *= 1 - (1 - fit) * cfg.fitW;          // 分路匹配（新秀容忍度高一点）
-      sc *= 1 + (counter - 1) * cfg.counterW;  // 克制对手（新秀基本不读）
-      // 战术人格：小幅偏好（±3~8%），不是固定套路
-      sc *= (per.pos[pos] || 1) * (per.arc[heroInPos(h, pos).arc] || 1);
-      if (cfg.compAware) sc *= aiCompFactor(d, side, h, pos);
-      sc *= 1 + cfg.noise * (rand() * 2 - 1);  // 判断噪声 = 失误率
-      cands.push({ pos, hero: h, sc });
+  const oppPicks = (d.picks[d.mySide] || []).map(e => {
+    const oh = heroByName(e.hero); if (!oh) return null;
+    const bl = heroBestLane(oh);
+    return heroInPos(oh, bl.pos, e.form);
+  }).filter(Boolean);
+  const cands = pool.map(h => {
+    const bl = heroBestLane(h);
+    // 熟练度：队里最擅长这个英雄的人（分路未定，取最优）
+    let prof = 1;
+    POS.forEach(pos => {
+      const pl = getPlayer(aiTeam, aiTeam.lineup[pos]);
+      if (pl) prof = Math.max(prof, profOf(pl, h.name));
     });
+    // 对位：与对手已选英雄的平均克制（对手分路未知，按各自最强分路估）
+    let counter = 1;
+    if (oppPicks.length) {
+      let prod = 1;
+      oppPicks.forEach(oh => { prod *= matchupMult(bl.h, oh); });
+      counter = Math.pow(prod, 1 / oppPicks.length);
+    }
+    let sc = heroStrength(bl.h);
+    sc *= 1 + (prof - 1) * cfg.profW;          // 选手擅长（新秀权重低）
+    sc *= 1 + (counter - 1) * cfg.counterW;    // 克制对手（新秀基本不读）
+    sc *= (per.pos[bl.pos] || 1) * (per.arc[bl.h.arc] || 1);   // 战术人格：软偏好
+    if (cfg.compAware) sc *= aiCompFactor(d, side, h, bl.pos);
+    sc *= 1 + cfg.noise * (rand() * 2 - 1);    // 判断噪声 = 失误率
+    return { hero: h, sc };
   });
   if (!cands.length) return;
   cands.sort((a, b) => b.sc - a.sc);
   const n = Math.max(1, Math.min(cfg.topN, cands.length));
   const pick = cands[randInt(0, n - 1)];
-  d.picks[side].push(pickEntry(pick.pos, pick.hero.name));
+  d.picks[side].push(pickEntry(null, pick.hero.name));
   d.used.push(pick.hero.name);
 }
 function runDraftAI() {
@@ -782,12 +793,16 @@ function runDraftAI() {
     else aiPickTurn(st);
     d.stepIndex++;
   }
-  if (d.stepIndex >= d.steps.length) { d.over = true; d.phase = "done"; }
+  if (d.stepIndex >= d.steps.length) { beginAssign(); return; }
 }
 function afterDraftAction() {
   runDraftAI();
   const d = S.series.draft;
-  if (d.stepIndex >= d.steps.length) { d.over = true; d.phase = "done"; simGame(); } // 计算战力，进入战前预览
+  // 双方都选满 5 个 → 进入排位阶段（先不给分路，方便真摇摆）
+  if (d.stepIndex >= d.steps.length || (d.picks[d.mySide].length >= 5 && d.picks[aiSide(d)].length >= 5)) {
+    beginAssign();
+    return;
+  }
   save(); render();
 }
 function draftBan(hn) {
@@ -799,36 +814,86 @@ function draftBan(hn) {
   sfx("ban");
   afterDraftAction();
 }
-/* 生成一条选将记录：多形态英雄会带上形态 key（不传则按分路自动取同名形态） */
+/* 生成一条选将记录。新流程：选将阶段不带分路（pos=null），等双方都选完再统一排位；
+   多形态英雄在选将时就要定形态（form），排位只决定它站哪一路。 */
 function pickEntry(pos, hn, form) {
   const h = heroByName(hn);
-  const e = { pos, hero: hn };
+  const e = { hero: hn, pos: pos || null };
   if (h && heroHasForms(h)) {
     const forms = HERO_FORMS[h.name];
     e.form = (form && forms[form]) ? form : (heroFormForPos(h, pos) || "mage");
   }
   return e;
 }
-function draftPick(pos, hn, form) {
+/* ---------------- 排位阶段（双方各 5 个英雄，选完再放分路） ---------------- */
+function unassigned(d, side) { return (d.picks[side] || []).filter(e => !e.pos); }
+function assignedPos(d, side) { return (d.picks[side] || []).map(e => e.pos).filter(Boolean); }
+/* 自动排位：按「分路匹配 × 位置权重 × 英雄强度」全局贪心，把手里 5 个排进空路 */
+function autoAssignSide(d, side) {
+  const pend = unassigned(d, side);
+  if (!pend.length) return;
+  const taken = assignedPos(d, side);
+  const pairs = [];
+  pend.forEach(e => POS.forEach(pos => {
+    if (taken.includes(pos)) return;
+    if ((d.picks[side] || []).some(x => x.pos === pos)) return;
+    const h = heroInPos(heroByName(e.hero), pos, e.form);
+    pairs.push({ e, pos, sc: laneFit(h, pos) * POS_WEIGHT[pos] * heroStrength(h) });
+  }));
+  pairs.sort((a, b) => b.sc - a.sc);
+  const used = new Set(), posUsed = new Set();
+  pairs.forEach(p => {
+    if (used.has(p.e) || posUsed.has(p.pos)) return;
+    p.e.pos = p.pos; used.add(p.e); posUsed.add(p.pos);
+  });
+}
+/* 手动排位：把某个英雄放到某一路（该路已有人则两人对调） */
+function assignLane(d, side, heroName, pos) {
+  const list = d.picks[side] || [];
+  const cur = list.find(e => e.hero === heroName);
+  if (!cur) return false;
+  const occupant = list.find(e => e.pos === pos && e !== cur);
+  if (occupant) occupant.pos = cur.pos || null;
+  cur.pos = pos;
+  return true;
+}
+/* 选将结束 → 进入排位：AI 立刻排好自己的（先不显示），玩家来排自己的 */
+function beginAssign() {
+  const d = S.series.draft;
+  d.phase = "assign";
+  autoAssignSide(d, aiSide(d));
+  save(); render();
+}
+function finishDraft() {
+  const d = S.series.draft;
+  if (unassigned(d, d.mySide).length) { toast("还有英雄没放到分路"); return false; }
+  autoAssignSide(d, aiSide(d));
+  d.over = true; d.phase = "done";
+  simGame();
+  return true;
+}
+/* 选将：只记英雄（+形态），不决定分路；双方选满 5 个后统一排位 */
+function draftPick(hn, form) {
   const s = S.series, d = s.draft;
+  if (!d || d.over || d.phase === "assign") return;
+  const my = d.picks[d.mySide] || [];
+  if (my.length >= 5) return;
+  const h = heroByName(hn);
+  if (!h) return;
+  if (my.some(e => e.hero === hn)) return;
   if (d.peak) {
-    // 巅峰对决：不受全局 BP 限制（此前用过的英雄仍可选），双方可撞英雄；但本队内不能重复
-    if (d.over) return;
-    if (filledPos(d, d.mySide).includes(pos)) return;
-    if (!heroByName(hn)) return;
-    if (d.picks[d.mySide].some(e => e.hero === hn)) return;
-    d.picks[d.mySide].push(pickEntry(pos, hn, form));
+    // 巅峰对决：不查全局BP（此前用过仍可选），本队内不重复
+    d.picks[d.mySide].push(pickEntry(null, hn, form));
     sfx("pick");
-    if (d.picks[d.mySide].length >= 5) finishPeakDraft();
+    if (d.picks[d.mySide].length >= 5) { revealPeakPicks(); beginAssign(); }
     save(); render();
     return;
   }
   const st = currentStep();
   if (!st || st.actor !== d.mySide || st.type !== "pick") return;
-  if (filledPos(d, d.mySide).includes(pos)) return;
-  const h = heroByName(hn);
-  if (!h || d.used.includes(hn) || myUsed().includes(hn)) return; // 只锁「本战队」用过的英雄；对方用过的仍可选用（英雄不分区）
-  d.picks[d.mySide].push(pickEntry(pos, hn, form)); d.used.push(hn); d.stepIndex++;
+  if (d.used.includes(hn) || myUsed().includes(hn)) return;   // 只锁「本战队」用过的英雄
+  d.picks[d.mySide].push(pickEntry(null, hn, form));
+  d.used.push(hn); d.stepIndex++;
   sfx("pick");
   afterDraftAction();
 }

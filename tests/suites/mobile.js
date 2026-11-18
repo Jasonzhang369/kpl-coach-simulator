@@ -40,8 +40,8 @@ module.exports = function (env, H) {
     if (pickStep >= 0) d.stepIndex = pickStep;
     T.renderSeries();
     const bpHtml = root();
-    ok("BP 看板有拖拽提示（桌面）", bpHtml.indexOf("拖拽英雄到分路") >= 0);
-    ok("BP 空槽有放置提示", bpHtml.indexOf("拖拽英雄到此") >= 0);
+    ok("BP 看板显示选将进度", /选将 \d\/5/.test(bpHtml) || bpHtml.indexOf("选将") >= 0);
+    ok("选将阶段提示「不选分路」", bpHtml.indexOf("这一步只选英雄") >= 0 || bpHtml.indexOf("分路等双方选满") >= 0);
 
     // 4) 积分榜有移动端滑动提示
     S().page = "main"; S().tab = "standings"; T.renderMain();

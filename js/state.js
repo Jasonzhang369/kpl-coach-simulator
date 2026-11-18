@@ -139,7 +139,7 @@ function openGuide(force) {
     ["1", "开档", "标题页选<b>难度</b>（只决定对手的 BP 水平）和<b>名单模式</b>（平衡选秀 / 真实大名单），挑一支战队开始执教。"],
     ["2", "转会", "赛季初转会窗口开放 <b>3 次</b>。买人进替补席，要去【阵容】提为首发才有用。卖出只能卖替补。"],
     ["3", "训练", "每轮补充训练点。特训单个属性（+2~3，23 岁以下再 +1）；练满后花 <b>3 点 + 约 200 万</b>突破上限。别忘了留点数<b>休息</b>回体能。"],
-    ["4", "BP", "按官方规则：4 ban + 10 选，红蓝方、后手 Counter、<b>全局 BP</b>（本队用过的英雄后续局不能再选）。第 7 局是<b>巅峰对决</b>——盲选、无 ban、不受全局 BP 限制。"],
+    ["4", "BP", "按官方规则：4 ban + 10 选，红蓝方、后手 Counter、<b>全局 BP</b>（本队用过的英雄后续局不能再选）。<b>先只选英雄</b>——双方各选满 5 个后进入<b>排位阶段</b>，这时才决定谁站哪一路（对手分路开打前不公开），所以能做真正的摇摆。第 7 局是<b>巅峰对决</b>：盲选、无 ban、不受全局 BP 限制。"],
     ["5", "比赛", "常规赛 BO5、季后赛 BO7。赛前先看战力对比，局内事件会真正改变结果；点「跳过战斗」只是快进，不会改变概率。"],
     ["6", "季后赛", "常规赛<b>前 4</b> 进双败淘汰赛。输了进败者组还有一次机会，总决赛一场定胜负。"],
     ["7", "长期", "每 3 个赛季 = 1 岁。27 岁起逐季衰退（主要掉操作与体能上限），记得提前培养接班人；合同到期会自动续约或离队。"],
@@ -153,7 +153,7 @@ function openGuide(force) {
     ["坦野", "可野坦克（阿古朵/猪八戒/夏侯惇/赵怀真/苏烈/程咬金…）比刺客少，但每个打野选手的初始英雄池<b>保底有 1 个</b>可用坦野——阵容判定要求<b>前排 ≥2</b>，坦野是凑第二个前排最省资源的路子。"],
     ["英雄特性", "个别英雄有机制特性，不占四维却影响对位：<b>庄周</b>大招解控，对<b>控制型英雄</b>（控制 ≥65）额外 +6% 战力，专门克制硬控先手体系。"],
     ["五形态", "<b>元流之子</b>是五形态英雄：BP 选到他时，卡片上会出现<b>法师 / 坦克 / 射手 / 辅助 / 刺客</b>五个形态按钮，先挑一个形态，再像普通英雄一样点<b>任意分路</b>落位。形态决定四维与定位（坦克形态才算前排），放到非本命分路照样吃逆用惩罚。<b>ban 一次就整只禁用；用掉任一形态后，其余四个本队都不能再选。</b>"],
-    ["手机操作", "页签在<b>屏幕底部</b>，随时可点。BP 不能拖拽，改成 <b>点英雄 → 再点分路</b> 两步；积分榜可左右滑动看完整数据。"]
+    ["手机操作", "页签在<b>屏幕底部</b>，随时可点。BP 是<b>点英雄 → 卡片里点确认</b>，排位是<b>点英雄 → 点分路</b>，都不用拖拽；积分榜可左右滑动看完整数据。"]
   ];
   mask.innerHTML = `<div class="modal guide-modal">
     <h3>📖 游玩指南</h3>
@@ -321,6 +321,9 @@ root.addEventListener("drop", (e) => {
 });
 // 分路槽点击：空槽=放置待选；已放置=选中/完成对调（不可撤销BP）
 function handleSlotClick(pos) {
+  // 新流程：选将阶段不再落分路，只有排位阶段点分路才有意义
+  const d0 = S.series && S.series.draft;
+  if (d0 && d0.phase === "assign") { handleAct("aplace:" + pos); return; }
   const d = S.series && S.series.draft; if (!d) return;
   const e = d.picks[d.mySide].find(x => x.pos === pos);
   if (e) {
@@ -403,6 +406,33 @@ function handleAct(act) {
     render(); return;
   }
   if (cmd === "pform") { S._pendingForm = args[0] || null; render(); return; }
+  if (cmd === "confirmpick") {
+    // 选将阶段：确认这只英雄（不带分路），随后由 afterDraftAction 推进
+    const hero = S._pendingHero; if (!hero) return;
+    draftPick(hero, S._pendingForm);
+    S._pendingHero = null; S._pendingForm = null;
+    return;
+  }
+  if (cmd === "ahero") { S._assignHero = (S._assignHero === args[0]) ? null : args[0]; render(); return; }
+  if (cmd === "aplace") {
+    const s = S.series, d = s && s.draft; if (!d || d.phase !== "assign") return;
+    const sel = S._assignHero; if (!sel) { toast("先点一个待分配的英雄"); return; }
+    assignLane(d, d.mySide, sel, args[0]);
+    S._assignHero = null; save(); render();
+    return;
+  }
+  if (cmd === "autoplace") {
+    const s = S.series, d = s && s.draft; if (!d || d.phase !== "assign") return;
+    autoAssignSide(d, d.mySide); S._assignHero = null; save(); render();
+    toast("已自动分配剩余英雄");
+    return;
+  }
+  if (cmd === "readylineup") {
+    const s = S.series, d = s && s.draft; if (!d || d.phase !== "assign") return;
+    if (unassigned(d, d.mySide).length) { toast("还有英雄没放到分路"); return; }
+    finishDraft();
+    return;
+  }
   if (cmd === "placeslot") { handleSlotClick(args[0]); return; }
   if (cmd === "battleskip") { skipBattle(); return; }
   if (cmd === "startbattle") { const s = S.series; if (s && s.sub === "preview") { s.sub = "battle"; startBattleTick(); save(); render(); } return; }

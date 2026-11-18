@@ -875,6 +875,10 @@ function renderPendingCard(name) {
       <div class="muted" style="font-size:11.5px">输出 <b>${h.o}</b> · 生存 <b>${h.s}</b> · 控制 <b>${h.c}</b> · 机动 <b>${h.m}</b></div>
       <div style="margin-top:4px">${good.map(x => tag(x, "green")).join(" ")}${bad.map(x => tag(x, "red")).join(" ")}${!good.length && !bad.length ? '<span class="muted" style="font-size:11px">对位无明显克制关系</span>' : ""}</div>
       ${formBar}
+      <div class="hero-opt" style="margin-top:6px">
+        <button class="btn gold sm" data-act="confirmpick" ${forms.length && !chosenKey ? "disabled" : ""} aria-label="确认选择 ${escapeHtml(base.name)}">✅ 确认选择${forms.length && !chosenKey ? "（先选形态）" : ""}</button>
+        <span class="muted" style="font-size:11px;align-self:center">选完这只就轮到对手，分路等双方各选满 5 个再排</span>
+      </div>
     </div>
   </div>`;
 }
@@ -908,27 +912,31 @@ function myAutoPick() {
   if (!autoBpAllowed()) return null;
   const s = S.series, d = s.draft, mySide = d.mySide, oth = aiSide(d);
   const myT = getMyTeam();
-  const filled = filledPos(d, mySide);
-  const unfilled = POS.filter(p => !filled.includes(p));
+  if ((d.picks[mySide] || []).length >= 5) return null;
   const pool = availHeroes();
-  const cands = [];
-  unfilled.forEach(pos => {
-    const starter = getPlayer(myT, myT.lineup[pos]);
-    const enemy = (d.picks[oth] || []).find(e => e.pos === pos);
-    const enemyHero = enemy ? heroByName(enemy.hero) : null;
-    const laneOk = pool.filter(h => laneFit(h, pos) >= LANE_PICK_FLOOR);
-    (laneOk.length ? laneOk : pool).forEach(h => {
-      const hL = heroInPos(h, pos);              // 元流之子：按本路形态算战力与克制
-      const prof = profOf(starter, h.name);
-      const fit = laneFit(hL, pos);              // 多形态英雄按本路形态算匹配度
-      const counter = enemyHero ? matchupMult(hL, heroInPos(enemyHero, pos)) : 1;
-      let sc = heroStrength(hL);
-      sc *= 1 + (prof - 1) * AUTO_BP.profW;
-      sc *= 1 - (1 - fit) * AUTO_BP.fitW;
-      sc *= 1 + (counter - 1) * AUTO_BP.counterW;
-      sc *= 1 + AUTO_BP.noise * (rand() * 2 - 1);
-      cands.push({ pos, hero: h.name, sc });
+  const oppPicks = (d.picks[oth] || []).map(e => {
+    const oh = heroByName(e.hero); if (!oh) return null;
+    const bl = heroBestLane(oh);
+    return heroInPos(oh, bl.pos, e.form);
+  }).filter(Boolean);
+  const cands = pool.map(h => {
+    const bl = heroBestLane(h);
+    let prof = 1;
+    POS.forEach(pos => {
+      const pl = getPlayer(myT, myT.lineup[pos]);
+      if (pl) prof = Math.max(prof, profOf(pl, h.name));
     });
+    let counter = 1;
+    if (oppPicks.length) {
+      let prod = 1;
+      oppPicks.forEach(oh => { prod *= matchupMult(bl.h, oh); });
+      counter = Math.pow(prod, 1 / oppPicks.length);
+    }
+    let sc = heroStrength(bl.h);
+    sc *= 1 + (prof - 1) * AUTO_BP.profW;
+    sc *= 1 + (counter - 1) * AUTO_BP.counterW;
+    sc *= 1 + AUTO_BP.noise * (rand() * 2 - 1);
+    return { hero: h.name, sc };
   });
   if (!cands.length) return null;
   cands.sort((a, b) => b.sc - a.sc);
@@ -948,36 +956,41 @@ function autoBpStep() {
   const s = S.series;
   if (!s || s.sub !== "draft" || !s.draft) return false;
   const d = s.draft;
-  if (d.peak) {
-    // 巅峰对决：一键补满我方 5 个分路（不考虑全局 BP）
+  // 排位阶段：把手里剩下的英雄摆进空路，摆完开打
+  if (d.phase === "assign") {
     if (d.over) return false;
-    const filled = filledPos(d, d.mySide);
-    const pos = POS.find(p => !filled.includes(p));
-    if (!pos) { finishPeakDraft(); return false; }
-    const hn = myPeakAutoPick(pos);
-    if (!hn) { finishPeakDraft(); return false; }
-    d.picks[d.mySide].push({ pos, hero: hn });
-    if (d.picks[d.mySide].length >= 5) { finishPeakDraft(); return false; }
+    const before = unassigned(d, d.mySide).length;
+    autoAssignSide(d, d.mySide);
+    if (unassigned(d, d.mySide).length === before) return false;
+    if (!unassigned(d, d.mySide).length) { finishDraft(); return false; }
+    save(); render();
     return true;
   }
-  if (d.over || d.stepIndex >= d.steps.length) {
-    if (!d.over) { d.over = true; d.phase = "done"; simGame(); }
+  if (d.phase === "done" || d.stepIndex >= d.steps.length) {
+    if (!d.over) beginAssign();
     return false;
   }
   const st = d.steps[d.stepIndex];
+  if (d.peak) {
+    const hn = (myAutoPick() || {}).hero;
+    if (!hn) return false;
+    draftPick(hn, null);
+    return true;
+  }
   if (st.type === "ban") {
     const hn = st.actor === d.mySide ? myAutoBan() : aiBanHero(st.actor);
-    if (!hn) return false;                       // 我方被禁用一键BP / ban池空：停在原步，不推进
+    if (!hn) return false;
     d.bans[st.actor].push(hn); d.used.push(hn);
   } else if (st.actor === d.mySide) {
     const pk = myAutoPick();
-    if (!pk) return false;                       // 同上：不跳过玩家的选将回合
-    d.picks[d.mySide].push({ pos: pk.pos, hero: pk.hero }); d.used.push(pk.hero);
+    if (!pk) return false;
+    draftPick(pk.hero, null);
+    return true;
   } else {
     aiPickTurn(st);
   }
   d.stepIndex++;
-  if (d.stepIndex >= d.steps.length) { d.over = true; d.phase = "done"; simGame(); return false; }
+  if (d.stepIndex >= d.steps.length) { beginAssign(); return false; }
   return true;
 }
 function autoBpTick() {
@@ -1024,66 +1037,109 @@ function renderSeries() {
   const peak = !!d.peak;
   const playerTurn = !d.over && currentActor() === mySide;
   const sideTag = mySide === "blue" ? '<span class="pill cyan">本局我方蓝方 · 先选</span>' : '<span class="pill red">本局我方红方 · 后手Counter</span>';
+  function banLine(side) {
+    return peak ? '<i class="muted">无（巅峰对决）</i>'
+      : ((d.bans[side] || []).length ? d.bans[side].map(b => escapeHtml(b)).join("、") : '<i class="muted">—</i>');
+  }
+  function chipRow(list, opts) {
+    const o = opts || {};
+    if (!list.length) return `<div class="muted" style="font-size:12px">${o.empty || "—"}</div>`;
+    return `<div class="hero-opt">${list.map(e => {
+      const base = heroByName(e.hero);
+      const fl = e.form ? heroFormLabel(base, e.pos || "mid", e.form) : "";
+      const sel = o.sel && o.sel === e.hero ? " gold" : "";
+      const act = o.clickable ? ` data-act="ahero:${escapeHtml(e.hero)}" aria-label="选中 ${escapeHtml(e.hero)} 准备排位"` : "";
+      return `<button class="btn ghost sm${sel}"${act}>${escapeHtml(e.hero)}${fl ? `<i class="muted" style="font-size:10px">·${fl}</i>` : ""}</button>`;
+    }).join("")}</div>`;
+  }
+  function laneRow(pos, e, opts) {
+    const o = opts || {};
+    let heroHtml;
+    const fit = e ? laneFit(heroInPos(heroByName(e.hero), pos, e.form), pos) : null;
+    if (e) {
+      const fl = e.form ? heroFormLabel(heroByName(e.hero), pos, e.form) : "";
+      heroHtml = `<span class="chip">${escapeHtml(e.hero)}${fl ? `<i class="muted" style="font-size:10px">·${fl}</i>` : ""}</span> <b class="${fitClass(fit)}" style="font-size:11px">${fitLabel(fit)}</b>`;
+    } else if (o.pending) {
+      const ph = heroInPos(heroByName(o.pending), pos, o.form);
+      const pf = laneFit(ph, pos);
+      heroHtml = `<span class="muted">放入【${escapeHtml(o.pending)}】</span> <b class="${fitClass(pf)}" style="font-size:11px">${fitLabel(pf)}</b>`;
+    } else heroHtml = `<span class="muted">${o.hint || "…"}</span>`;
+    const act = o.act || `data-act="placeslot:${pos}"`;
+    return `<div class="draft-row slot ${e ? 'filled' : ''} ${o.hint && !e ? 'hint' : ''}" data-slot="${pos}" ${act}><span class="pname">${POS_NAME[pos]}</span><span class="phero">${heroHtml}</span></div>`;
+  }
+  // 对手侧（以及一切非我方交互的展示）：未开打前只公开英雄，不公开分路
   function board(side) {
-    const banTxt = peak ? '<i class="muted">无（巅峰对决）</i>' : (d.bans[side].length ? d.bans[side].map(b => escapeHtml(b)).join("、") : '<i class="muted">—</i>');
-    // 巅峰对决为盲选：我方填满前不揭示对手阵容
+    const list = d.picks[side] || [];
     if (peak && !d.over && side !== mySide) {
-      const hiddenRows = POS.map(pos => `<div class="draft-row"><span class="pname">${POS_NAME[pos]}</span><span class="phero"><i class="muted">盲选中…</i></span></div>`).join("");
-      return `<div class="draft-side foe">
-      <div class="draft-head">${escapeHtml(opp.name)} · ${sideName(side)} · 盲选</div>
-      <div class="draft-bans">禁：${banTxt}</div>
-      ${hiddenRows}</div>`;
+      const hidden = POS.map(() => `<div class="draft-row"><span class="pname">—</span><span class="phero"><i class="muted">盲选中…</i></span></div>`).join("");
+      return `<div class="draft-side foe"><div class="draft-head">${escapeHtml(opp.name)} · ${sideName(side)} · 盲选</div><div class="draft-bans">禁：${banLine(side)}</div>${hidden}</div>`;
     }
-    const rows = POS.map(pos => {
-      const e = d.picks[side].find(x => x.pos === pos);
-      const h = e ? heroInPos(heroByName(e.hero), pos, e.form) : null;   // 多形态英雄按已选形态显示
-      const fl = e ? heroFormLabel(heroByName(e.hero), pos, e.form) : "";
-      const fit = h ? laneFit(h, pos) : null;
-      const fitHtml = h ? ` <b class="${fitClass(fit)}" style="font-size:11px">${fitLabel(fit)}</b>` : "";
-      const mini = h ? `<span class="mini-radar" title="OSCM 输出${h.o}/生存${h.s}/控制${h.c}/机动${h.m}">${radarSvg([{ vals: oscmVals(h), color: "#8b96b0", fill: "rgba(139,150,176,.18)" }], 22)}</span>` : "";
-      return `<div class="draft-row"><span class="pname">${POS_NAME[pos]}</span><span class="phero">${e ? escapeHtml(e.hero) + (fl ? `<i class="muted" style="font-size:10px">·${fl}</i>` : "") + fitHtml + mini : '<i class="muted">…</i>'}</span></div>`;
-    }).join("");
+    if (!d.over) {
+      return `<div class="draft-side ${side === mySide ? 'me' : 'foe'}">
+        <div class="draft-head">${side === mySide ? "我方" : escapeHtml(opp.name)} · ${sideName(side)}${peak ? " · 巅峰对决" : ""}（已选 ${list.length}/5）</div>
+        <div class="draft-bans">禁：${banLine(side)}</div>
+        ${chipRow(list, { empty: "还没有英雄" })}
+        <div class="muted" style="font-size:11px;margin-top:4px">${d.phase === "assign" ? "分路开打前不公开" : "分路等双方选满 5 个后再统一排"}</div></div>`;
+    }
+    const rows = POS.map(pos => laneRow(pos, list.find(x => x.pos === pos), { hint: "…", act: "" })).join("");
     return `<div class="draft-side ${side === mySide ? 'me' : 'foe'}">
       <div class="draft-head">${side === mySide ? "我方" : escapeHtml(opp.name)} · ${sideName(side)}${peak ? " · 巅峰对决" : ""}</div>
-      <div class="draft-bans">禁：${banTxt}</div>
+      <div class="draft-bans">禁：${banLine(side)}</div>
       ${rows}</div>`;
   }
-  // 我方侧：选将回合变为可拖拽的分路槽
+  // 我方侧：选将阶段显示已选英雄；排位阶段变成可点的分路槽
   const st = currentStep();
   const peakTurn = peak && !d.over;
   const pickTurn = peak ? peakTurn : (playerTurn && st && st.type === "pick");
   function myBoard() {
-    if (!pickTurn) return board(mySide);
-    const pending = S._pendingHero;
-    const rows = POS.map(pos => {
-      const e = d.picks[mySide].find(x => x.pos === pos);
-      let heroHtml, fit = null;
-      const sw = S._swapFrom === pos ? " swapfrom" : "";
-      if (e) {
-        const h = heroInPos(heroByName(e.hero), pos, e.form);   // 多形态英雄按已选形态显示
-        fit = laneFit(h, pos);
-        const fl = heroFormLabel(heroByName(e.hero), pos, e.form);
-        const mini = `<span class="mini-radar" title="OSCM 输出${h.o}/生存${h.s}/控制${h.c}/机动${h.m}">${radarSvg([{ vals: oscmVals(h), color: "#34d3e0", fill: "rgba(52,211,224,.22)" }], 22)}</span>`;
-        heroHtml = `<span class="chip" draggable="true" data-hero="${escapeHtml(e.hero)}">${escapeHtml(e.hero)}${fl ? `<i class="muted" style="font-size:10px">·${fl}</i>` : ""}</span> <b class="${fitClass(fit)}" style="font-size:11px">${fitLabel(fit)}</b>${mini}`;
-      }
-      else if (pending) {
-        const ph = heroInPos(heroByName(pending), pos, S._pendingForm);
-        fit = laneFit(ph, pos);
-        const enemySame = d.picks[oth].find(x => x.pos === pos);
-        const lbl = enemySame ? matchupLabel(ph, heroByName(enemySame.hero)) : "";
-        heroHtml = `<span class="muted">放置【${escapeHtml(pending)}】</span> <b class="${fitClass(fit)}" style="font-size:11px">${fitLabel(fit)}</b>${lbl ? ` <b class="${lbl === '克制' ? 'c-good' : lbl === '被克' ? 'c-bad' : 'c-mid'}" style="font-size:11px">${lbl}</b>` : ""}`;
-      }
-      else heroHtml = `<span class="muted">${isTouchDevice() ? "点这里放置已选英雄" : "拖拽英雄到此 / 或先点英雄"}</span>`;
-      return `<div class="draft-row slot ${e ? 'filled' : ''} ${pending && !e ? 'hint' : ''}${sw}" data-slot="${pos}" data-act="placeslot:${pos}"><span class="pname">${POS_NAME[pos]}</span><span class="phero">${heroHtml}</span></div>`;
-    }).join("");
-    return `<div class="draft-side me">
-      <div class="draft-head">我方 · ${sideName(mySide)}（${isTouchDevice() ? "点英雄 → 再点分路" : "拖拽英雄到分路"}）${peak ? " · 巅峰对决" : ""}</div>
-      <div class="draft-bans">禁：${peak ? '<i class="muted">无（巅峰对决）</i>' : (d.bans[mySide].length ? d.bans[mySide].map(b => escapeHtml(b)).join("、") : '<i class="muted">—</i>')}</div>
-      ${rows}</div>`;
+    const myList = d.picks[mySide] || [];
+    if (d.phase === "assign" && !d.over) {
+      const pend = unassigned(d, mySide);
+      const sel = S._assignHero;
+      const rows = POS.map(pos => {
+        const e = myList.find(x => x.pos === pos);
+        return laneRow(pos, e, {
+          pending: !e && sel ? sel : "",
+          form: !e && sel ? (myList.find(x => x.hero === sel) || {}).form : "",
+          hint: "点上方英雄，再点这里",
+          act: `data-act="aplace:${pos}"`
+        });
+      }).join("");
+      return `<div class="draft-side me">
+        <div class="draft-head">我方 · ${sideName(mySide)}（排位：先点英雄，再点分路）</div>
+        <div class="draft-bans">禁：${banLine(mySide)}</div>
+        <div class="muted" style="font-size:11.5px;margin:6px 0 2px">待分配 <b>${pend.length}</b> 个：点一下英雄选中，再点分路落位；点到已有人的分路＝两人对调</div>
+        ${chipRow(pend, { clickable: true, sel: sel, empty: "全部排好了，点下面『确定阵容』开打" })}
+        ${rows}</div>`;
+    }
+    if (!d.over && !pickTurn) {
+      return `<div class="draft-side me">
+        <div class="draft-head">我方 · ${sideName(mySide)}（已选 ${myList.length}/5）</div>
+        <div class="draft-bans">禁：${banLine(mySide)}</div>
+        ${chipRow(myList, { empty: "还没选到英雄" })}
+        <div class="muted" style="font-size:11px;margin-top:4px">分路等双方选满 5 个后再统一排</div></div>`;
+    }
+    if (!d.over && pickTurn) {
+      return `<div class="draft-side me">
+        <div class="draft-head">我方 · ${sideName(mySide)}（选将 ${myList.length}/5）${peak ? " · 巅峰对决" : ""}</div>
+        <div class="draft-bans">禁：${banLine(mySide)}</div>
+        ${chipRow(myList, { empty: "点下方英雄 → 在卡片里点『确认选择』" })}
+        <div class="muted" style="font-size:11px;margin-top:4px">这一步只选英雄，不选分路</div></div>`;
+    }
+    return board(mySide);
   }
   let action = "";
   const banNo = d.bans[mySide].length + 1; // 我方第几个ban（共5）
-  if (peakTurn) {
+  if (d.phase === "assign" && !d.over) {
+    const left = unassigned(d, mySide).length;
+    action = `<div class="warn" style="border-color:rgba(52,211,224,.4);background:rgba(52,211,224,.07)">
+      🎯 双方 5 个英雄都选完了，进入<b>排位阶段</b>：点上方英雄 → 再点分路落位（点到有人的分路＝两人对调）。排好 5 个才能开打；<b>对手的分路开打前不公开</b>。
+    </div>
+    <div class="hero-opt" style="margin-top:8px">
+      <button class="btn ghost sm" data-act="autoplace" aria-label="自动把剩余英雄分配到最合适的分路">⚡ 自动分配</button>
+      <button class="btn gold sm" data-act="readylineup" ${left ? "disabled" : ""} aria-label="确定阵容并开始比赛">✅ 确定阵容，开始比赛${left ? `（还有 ${left} 个没放）` : ""}</button>
+    </div>`;
+  } else if (peakTurn) {
     // 巅峰对决：全部英雄可选（含此前用过的），无 ban、不受全局BP限制
     const pending = S._pendingHero;
     const prevUsed = myUsed();
@@ -1130,7 +1186,7 @@ function renderSeries() {
       const otag = oppPrev.includes(h.name) ? `<em class="otag" title="对手战队用过，本队仍可选用">敌用</em>` : "";
       return `<button class="hero-chip ${sel}" ${isTouchDevice() ? "" : "draggable=\"true\""} data-hero="${h.name}" data-lane="${h.pos}" data-mine="${mine ? 1 : 0}" data-oppused="${oppPrev.includes(h.name) ? 1 : 0}" data-act="pickhero:${h.name}" aria-label="选择 ${h.name}，${POS_NAME[h.pos]}，${ARC_NAME[h.arc]}${mine ? "，本队选手擅长" : ""}${oppPrev.includes(h.name) ? "，对手用过但本队仍可选" : ""}">${h.name}${star}${otag}<i class="muted" style="font-size:10px"> ${heroHasForms(h) ? "五形态" : ARC_NAME[h.arc]}</i></button>`;
     }).join("");
-    action = `<div class="section-title mt">选将台（${isTouchDevice() ? "先点英雄 → 再点上方分路" : "点英雄或直接拖拽到左侧分路"}）${sideTag}</div>
+    action = `<div class="section-title mt">选将台（点英雄 → 在卡片里点「确认选择」；分路等双方各选满 5 个再排）${sideTag}</div>
       ${pending ? renderPendingCard(pending) : ""}
       ${bpFilterBarHtml("bench")}
       <div class="bench" id="bench" data-scroll-id="bench">${benchHtml || '<div class="muted">已无可选英雄</div>'}</div>

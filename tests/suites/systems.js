@@ -126,7 +126,11 @@ module.exports = function (env, H) {
         const d = S().series.draft;
         T.aiPickTurn({ actor: T.aiSide(d) });
         const pick = d.picks[T.aiSide(d)][0];
-        if (pick) counts[pick.pos] = (counts[pick.pos] || 0) + 1;
+        if (pick) {
+          // 选将阶段不带分路，用「该英雄最强能站哪一路」作为统计口径
+          const bl = T.heroBestLane(T.heroByName(pick.hero));
+          counts[bl.pos] = (counts[bl.pos] || 0) + 1;
+        }
       }
       return counts;
     }
@@ -509,13 +513,19 @@ module.exports = function (env, H) {
     ok("待选卡片给出五个形态按钮", ["mage", "tank", "marksman", "support", "assassin"].every(k => pend.indexOf(`data-act="pform:${k}"`) >= 0));
     T.handleAct("pform:tank");
     ok("选中坦克形态", /坦克形态/.test(root()) && root().indexOf("data-act=\"pform:tank\"") >= 0);
+    T.handleAct("confirmpick");
     const dd = T.getS().series.draft;
-    dd.stepIndex = dd.steps.findIndex(st => st.actor === dd.mySide && st.type === "pick");
-    T.handleAct("placeslot:jungle");
-    const pick = T.getS().series.draft.picks[dd.mySide].find(x => x.hero === "元流之子");
-    ok("落位后 pick 带形态", pick && pick.form === "tank" && pick.pos === "jungle", pick && (pick.pos + "/" + pick.form));
+    const pick = dd.picks[dd.mySide].find(x => x.hero === "元流之子");
+    ok("确认后只记英雄、不带分路", pick && pick.form === "tank" && !pick.pos, pick && (pick.pos + "/" + pick.form));
+    // 进入排位阶段，手动把它放到打野
+    T.beginAssign();
+    T.handleAct("ahero:元流之子");
+    T.handleAct("aplace:jungle");
+    const pick2 = T.getS().series.draft.picks[dd.mySide].find(x => x.hero === "元流之子");
+    ok("排位后分路为打野且形态保留", pick2 && pick2.pos === "jungle" && pick2.form === "tank", pick2 && (pick2.pos + "/" + pick2.form));
+    ok("元坦打野算主场", T.laneFit(T.heroInPos(ud, "jungle", "tank"), "jungle") === 1);
     T.renderSeries();
-    ok("阵容区显示「元流之子·坦克形态」", /元流之子<i[^>]*>·坦克形态/.test(root()) || root().indexOf("·坦克形态") >= 0);
+    ok("看板显示「元流之子·坦克形态」", root().indexOf("·坦克形态") >= 0);
 
     // 用掉一个形态 = 整个英雄被消耗（其余四个也不可选）
     const dNow = T.getS().series.draft;

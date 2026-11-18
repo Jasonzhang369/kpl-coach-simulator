@@ -56,9 +56,10 @@ module.exports = function (env, H) {
         const d = S().series.draft;
         const side = kind === "mine" ? d.mySide : T.aiSide(d);
         for (let k = 0; k < 5; k++) {
-          if (kind === "mine") { const pk = T.myAutoPick(); if (pk) d.picks[d.mySide].push({ pos: pk.pos, hero: pk.hero }); }
+          if (kind === "mine") { const pk = T.myAutoPick(); if (pk) d.picks[d.mySide].push(T.pickEntry(null, pk.hero)); }
           else T.aiPickTurn({ actor: side });
         }
+        T.autoAssignSide(d, side);   // 新流程：双方选满 5 个后再统一排位
         q += quality(d.picks[side], me());
         S().series.oppId = realOpp;
         n++;
