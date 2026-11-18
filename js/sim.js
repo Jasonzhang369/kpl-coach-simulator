@@ -749,9 +749,9 @@ function aiPickTurn(st) {
     const laneOk = pool.filter(h => laneFit(h, pos) >= LANE_PICK_FLOOR);
     const usePool = laneOk.length ? laneOk : pool;
     usePool.forEach(h => {
-      const prof = profOf(starter, h.name);
-      const fit = laneFit(h, pos);
       const hL = heroInPos(h, pos);            // 元流之子按本路形态参与打分
+      const prof = profOf(starter, h.name);
+      const fit = laneFit(hL, pos);            // 多形态英雄：按本路形态的分路算匹配度
       const counter = enemyHero ? matchupMult(hL, heroInPos(enemyHero, pos)) : 1;
       let sc = heroStrength(hL);
       sc *= 1 + (prof - 1) * cfg.profW;        // 选手擅长（新秀权重低）
@@ -768,7 +768,7 @@ function aiPickTurn(st) {
   cands.sort((a, b) => b.sc - a.sc);
   const n = Math.max(1, Math.min(cfg.topN, cands.length));
   const pick = cands[randInt(0, n - 1)];
-  d.picks[side].push({ pos: pick.pos, hero: pick.hero.name });
+  d.picks[side].push(pickEntry(pick.pos, pick.hero.name));
   d.used.push(pick.hero.name);
 }
 function runDraftAI() {
@@ -799,7 +799,17 @@ function draftBan(hn) {
   sfx("ban");
   afterDraftAction();
 }
-function draftPick(pos, hn) {
+/* 生成一条选将记录：多形态英雄会带上形态 key（不传则按分路自动取同名形态） */
+function pickEntry(pos, hn, form) {
+  const h = heroByName(hn);
+  const e = { pos, hero: hn };
+  if (h && heroHasForms(h)) {
+    const forms = HERO_FORMS[h.name];
+    e.form = (form && forms[form]) ? form : (heroFormForPos(h, pos) || "mage");
+  }
+  return e;
+}
+function draftPick(pos, hn, form) {
   const s = S.series, d = s.draft;
   if (d.peak) {
     // 巅峰对决：不受全局 BP 限制（此前用过的英雄仍可选），双方可撞英雄；但本队内不能重复
@@ -807,7 +817,7 @@ function draftPick(pos, hn) {
     if (filledPos(d, d.mySide).includes(pos)) return;
     if (!heroByName(hn)) return;
     if (d.picks[d.mySide].some(e => e.hero === hn)) return;
-    d.picks[d.mySide].push({ pos, hero: hn });
+    d.picks[d.mySide].push(pickEntry(pos, hn, form));
     sfx("pick");
     if (d.picks[d.mySide].length >= 5) finishPeakDraft();
     save(); render();
@@ -818,7 +828,7 @@ function draftPick(pos, hn) {
   if (filledPos(d, d.mySide).includes(pos)) return;
   const h = heroByName(hn);
   if (!h || d.used.includes(hn) || myUsed().includes(hn)) return; // 只锁「本战队」用过的英雄；对方用过的仍可选用（英雄不分区）
-  d.picks[d.mySide].push({ pos, hero: hn }); d.used.push(hn); d.stepIndex++;
+  d.picks[d.mySide].push(pickEntry(pos, hn, form)); d.used.push(hn); d.stepIndex++;
   sfx("pick");
   afterDraftAction();
 }

@@ -846,25 +846,35 @@ function renderOscmPanel(myPicks, oppPicks, oppName) {
 
 /* ---------------- 选将中的英雄卡片（OSCM + 跨分路克制提示） ---------------- */
 function renderPendingCard(name) {
-  const h = heroByName(name);
-  if (!h) return "";
+  const base = heroByName(name);
+  if (!base) return "";
+  const forms = heroFormList(base);
+  const chosenKey = forms.length ? (S._pendingForm || "") : "";
+  const h = forms.length ? heroInPos(base, chosenKey ? (HERO_FORMS[base.name][chosenKey].pos) : "mid", chosenKey) : base;
   const d = S.series.draft, oth = aiSide(d);
   const rel = POS.map(pos => {
     const e = d.picks[oth].find(x => x.pos === pos);
     if (!e) return null;
-    const eh = heroByName(e.hero);
-    const m = matchupMult(h, eh);
-    return { pos, hero: e.hero, m, note: heroCounterNote(h.name, eh.name) };
+    const eh = heroInPos(heroByName(e.hero), pos, e.form);
+    const m = matchupMult(heroInPos(base, pos, chosenKey), eh);
+    return { pos, hero: e.hero, m, note: heroCounterNote(base.name, eh.name) };
   }).filter(Boolean);
   const good = rel.filter(x => x.m >= 1.06).sort((a, b) => b.m - a.m).slice(0, 3);
   const bad = rel.filter(x => x.m <= 0.96).sort((a, b) => a.m - b.m).slice(0, 2);
   const tag = (x, cls) => `<span class="pill ${cls}" style="font-size:10px">${POS_NAME[x.pos]} ${x.hero} ×${x.m.toFixed(2)}${x.note ? ` · ${escapeHtml(x.note)}` : ""}</span>`;
+  // 五形态英雄：先把形态选掉，再像普通英雄一样点分路落位
+  const formBar = forms.length ? `<div class="hero-opt" style="margin-top:6px">
+      <span class="muted" style="font-size:11.5px;margin-right:4px">选择形态：</span>
+      ${forms.map(f => `<button class="btn ghost sm ${chosenKey === f.key ? "gold" : ""}" data-act="pform:${f.key}" aria-pressed="${chosenKey === f.key}" aria-label="选择 ${base.name} 的${f.label}（本命分路${POS_NAME[f.pos]}）">${f.label}<i class="muted" style="font-size:10px"> ${POS_NAME[f.pos]}</i></button>`).join("")}
+    </div>
+    <div class="muted" style="font-size:11px;margin-top:2px">选好形态后点<b>任意分路</b>落位；放到非本命分路会按逆用吃分路惩罚（和普通英雄一样）。<b>用掉任一形态后，其余四个本队都不再可选。</b></div>` : "";
   return `<div class="pend-card">
     <span class="mini-radar">${radarSvg([{ vals: oscmVals(h), color: "#f5c518", fill: "rgba(245,197,24,.22)" }], 64, true)}</span>
     <div style="flex:1">
-      <div><b style="color:var(--gold)">${escapeHtml(h.name)}</b> <span class="muted" style="font-size:11px">${POS_NAME[h.pos]} · ${ARC_NAME[h.arc]}</span></div>
+      <div><b style="color:var(--gold)">${escapeHtml(base.name)}${forms.length && chosenKey ? "（" + heroFormLabel(base, h.pos, chosenKey) + "）" : ""}</b> <span class="muted" style="font-size:11px">${POS_NAME[h.pos]} · ${ARC_NAME[h.arc]}</span></div>
       <div class="muted" style="font-size:11.5px">输出 <b>${h.o}</b> · 生存 <b>${h.s}</b> · 控制 <b>${h.c}</b> · 机动 <b>${h.m}</b></div>
       <div style="margin-top:4px">${good.map(x => tag(x, "green")).join(" ")}${bad.map(x => tag(x, "red")).join(" ")}${!good.length && !bad.length ? '<span class="muted" style="font-size:11px">对位无明显克制关系</span>' : ""}</div>
+      ${formBar}
     </div>
   </div>`;
 }
@@ -908,9 +918,9 @@ function myAutoPick() {
     const enemyHero = enemy ? heroByName(enemy.hero) : null;
     const laneOk = pool.filter(h => laneFit(h, pos) >= LANE_PICK_FLOOR);
     (laneOk.length ? laneOk : pool).forEach(h => {
-      const prof = profOf(starter, h.name);
-      const fit = laneFit(h, pos);
       const hL = heroInPos(h, pos);              // 元流之子：按本路形态算战力与克制
+      const prof = profOf(starter, h.name);
+      const fit = laneFit(hL, pos);              // 多形态英雄按本路形态算匹配度
       const counter = enemyHero ? matchupMult(hL, heroInPos(enemyHero, pos)) : 1;
       let sc = heroStrength(hL);
       sc *= 1 + (prof - 1) * AUTO_BP.profW;
@@ -992,23 +1002,6 @@ function autoBp() {
 }
 
 /* ---------------- 系列赛页面 ---------------- */
-/* 多形态英雄的形态切换条：元流之子打野默认「坦克形态」（元坦打野是主流），可切刺客形态。
-   只在 BP 未结束、且我方已选出带备选形态的英雄时出现。 */
-function renderFormBar(d) {
-  if (!d || d.over) return "";
-  const rows = (d.picks[d.mySide] || []).map(e => {
-    const h = heroByName(e.hero); if (!h || !heroHasForms(h)) return "";
-    const choices = heroFormChoices(h, e.pos);
-    if (!choices.length) return "";
-    const cur = e.form || "";
-    return `<div class="hero-opt" style="align-items:center">
-      <span class="muted" style="font-size:12px;margin-right:6px">${escapeHtml(h.name)}（${POS_NAME[e.pos]}）形态：</span>
-      ${choices.map(c => `<button class="btn ghost sm ${cur === c.key ? "gold" : ""}" data-act="mform:${c.key}" aria-pressed="${cur === c.key}" aria-label="把 ${escapeHtml(h.name)} 在${POS_NAME[e.pos]}的形态切换为${c.label}">${c.label}</button>`).join("")}
-      <span class="muted" style="font-size:11px">切形态会改变四维、战力与阵容判定（坦克形态才算前排）</span>
-    </div>`;
-  }).filter(Boolean).join("");
-  return rows ? `<div class="warn" style="border-color:rgba(52,211,224,.35);background:rgba(52,211,224,.06)">${rows}</div>` : "";
-}
 function renderSeries() {
   const s = S.series, d = s.draft;
   const myT = getMyTeam(), opp = S.teams.find(t => t.id === s.oppId);
@@ -1043,11 +1036,12 @@ function renderSeries() {
     }
     const rows = POS.map(pos => {
       const e = d.picks[side].find(x => x.pos === pos);
-      const h = e ? heroByName(e.hero) : null;
+      const h = e ? heroInPos(heroByName(e.hero), pos, e.form) : null;   // 多形态英雄按已选形态显示
+      const fl = e ? heroFormLabel(heroByName(e.hero), pos, e.form) : "";
       const fit = h ? laneFit(h, pos) : null;
       const fitHtml = h ? ` <b class="${fitClass(fit)}" style="font-size:11px">${fitLabel(fit)}</b>` : "";
       const mini = h ? `<span class="mini-radar" title="OSCM 输出${h.o}/生存${h.s}/控制${h.c}/机动${h.m}">${radarSvg([{ vals: oscmVals(h), color: "#8b96b0", fill: "rgba(139,150,176,.18)" }], 22)}</span>` : "";
-      return `<div class="draft-row"><span class="pname">${POS_NAME[pos]}</span><span class="phero">${e ? escapeHtml(e.hero) + fitHtml + mini : '<i class="muted">…</i>'}</span></div>`;
+      return `<div class="draft-row"><span class="pname">${POS_NAME[pos]}</span><span class="phero">${e ? escapeHtml(e.hero) + (fl ? `<i class="muted" style="font-size:10px">·${fl}</i>` : "") + fitHtml + mini : '<i class="muted">…</i>'}</span></div>`;
     }).join("");
     return `<div class="draft-side ${side === mySide ? 'me' : 'foe'}">
       <div class="draft-head">${side === mySide ? "我方" : escapeHtml(opp.name)} · ${sideName(side)}${peak ? " · 巅峰对决" : ""}</div>
@@ -1066,13 +1060,14 @@ function renderSeries() {
       let heroHtml, fit = null;
       const sw = S._swapFrom === pos ? " swapfrom" : "";
       if (e) {
-        const h = heroByName(e.hero);
+        const h = heroInPos(heroByName(e.hero), pos, e.form);   // 多形态英雄按已选形态显示
         fit = laneFit(h, pos);
+        const fl = heroFormLabel(heroByName(e.hero), pos, e.form);
         const mini = `<span class="mini-radar" title="OSCM 输出${h.o}/生存${h.s}/控制${h.c}/机动${h.m}">${radarSvg([{ vals: oscmVals(h), color: "#34d3e0", fill: "rgba(52,211,224,.22)" }], 22)}</span>`;
-        heroHtml = `<span class="chip" draggable="true" data-hero="${escapeHtml(e.hero)}">${escapeHtml(e.hero)}</span> <b class="${fitClass(fit)}" style="font-size:11px">${fitLabel(fit)}</b>${mini}`;
+        heroHtml = `<span class="chip" draggable="true" data-hero="${escapeHtml(e.hero)}">${escapeHtml(e.hero)}${fl ? `<i class="muted" style="font-size:10px">·${fl}</i>` : ""}</span> <b class="${fitClass(fit)}" style="font-size:11px">${fitLabel(fit)}</b>${mini}`;
       }
       else if (pending) {
-        const ph = heroByName(pending);
+        const ph = heroInPos(heroByName(pending), pos, S._pendingForm);
         fit = laneFit(ph, pos);
         const enemySame = d.picks[oth].find(x => x.pos === pos);
         const lbl = enemySame ? matchupLabel(ph, heroByName(enemySame.hero)) : "";
@@ -1147,7 +1142,6 @@ function renderSeries() {
     ${renderLineupVs()}
     <div class="draft-board">${myBoard()}<div class="draft-vs">VS</div>${board(oth)}</div>
     ${renderOscmPanel(Object.fromEntries(d.picks[mySide].map(e => [e.pos, e.hero])), Object.fromEntries(d.picks[oth].map(e => [e.pos, e.hero])), opp.name)}
-    ${renderFormBar(d)}
     ${renderPastGames()}
     <div class="flex-between mt">
       <div class="hero-opt">

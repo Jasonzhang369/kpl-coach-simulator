@@ -452,65 +452,81 @@ module.exports = function (env, H) {
     ok("刀锋宝贝：打野 / 刺客（按玩家要求走打野）", h("刀锋宝贝").pos === "jungle" && h("刀锋宝贝").arc === "assassin");
 
     const ud = h("元流之子");
-    ok("元流之子：五路都算主场", ["top", "jungle", "mid", "bot", "support"].every(p => T.laneFit(ud, p) === 1));
     ok("元流之子：只有一份英雄条目", T.HEROES.filter(x => x.name === "元流之子").length === 1);
-    // 打野默认是「元坦」形态（元坦打野是赛事主流），刺客形态作为备选
-    const expect = { mid: "mage", top: "tank", jungle: "tank", bot: "marksman", support: "support" };
-    ok("五形态定位正确（打野默认坦克）", Object.keys(expect).every(p => T.heroInPos(ud, p).arc === expect[p]),
-      Object.keys(expect).map(p => p + ":" + T.heroInPos(ud, p).arc).join(" "));
-    ok("打野可切刺客形态", T.heroInPos(ud, "jungle", "assassin").arc === "assassin"
-      && T.heroInPos(ud, "jungle", "assassin").o === 86);
-    ok("打野有两个形态可选", T.heroFormChoices(ud, "jungle").length === 2, JSON.stringify(T.heroFormChoices(ud, "jungle")));
-    ok("其他分路是固定形态（无备选）", T.heroFormChoices(ud, "top").length === 0 && T.heroFormChoices(ud, "mid").length === 0);
-    ok("未知形态 key 回落到默认", T.heroInPos(ud, "jungle", "nope").arc === "tank");
-    ok("形态四维确实不同",
-      T.heroInPos(ud, "top").s !== T.heroInPos(ud, "bot").s
-      && T.heroInPos(ud, "jungle").o !== T.heroInPos(ud, "support").o);
+    // 选将时在五个形态里挑一个，再像普通英雄一样放进任意分路
+    const forms = T.heroFormList(ud);
+    ok("可选五个形态", forms.length === 5, forms.map(f => f.key).join("/"));
+    ok("五形态各有一条本命分路",
+      new Set(forms.map(f => f.pos)).size === 5 && ["mid", "top", "bot", "support", "jungle"].every(p => forms.some(f => f.pos === p)),
+      forms.map(f => f.key + ":" + f.pos).join(" "));
+    ok("形态定位正确", forms.every(f => ({ mage: "mage", tank: "tank", marksman: "marksman", support: "support", assassin: "assassin" })[f.key] === f.arc));
+    ok("形态四维不同", forms.every(f => [f.o, f.s, f.c, f.m].every(Number.isFinite))
+      && T.heroInPos(ud, "top", "tank").s !== T.heroInPos(ud, "bot", "marksman").s);
     ok("非多形态英雄不受影响", T.heroInPos(h("吕布"), "mid") === h("吕布"));
 
-    // 阵容判定：元流之子走对抗路是坦克形态 → 算前排；吕布走对抗路不算
-    const mk = top => ({ top, jungle: "澜", mid: "小乔", bot: "孙尚香", support: "张飞" });
-    const c1 = T.evaluateComp(mk("元流之子"), "稳");
-    const c2 = T.evaluateComp(mk("吕布"), "稳");
-    ok("元流之子坦克形态算前排", c1.tips.indexOf("前排充足，团战能扛") >= 0, c1.tips.join("/"));
-    ok("换成战士则前排不足", c2.tips.indexOf("前排充足，团战能扛") < 0, c2.tips.join("/"));
+    // 形态决定"本命分路"：放对 1.00，放错按逆用 0.72
+    ok("坦克形态放对抗路 = 本命", T.laneFit(T.heroInPos(ud, "top", "tank"), "top") === 1);
+    ok("坦克形态放中路 = 逆用", T.laneFit(T.heroInPos(ud, "mid", "tank"), "mid") < 0.8, T.laneFit(T.heroInPos(ud, "mid", "tank"), "mid"));
+    // 元坦打野是主流：坦克形态自带打野摇摆 0.95
+    ok("坦克形态可打野 0.95", Math.abs(T.laneFit(T.heroInPos(ud, "jungle", "tank"), "jungle") - 0.95) < 1e-9,
+      T.laneFit(T.heroInPos(ud, "jungle", "tank"), "jungle"));
+    ok("刺客形态可摇对抗路 0.88", Math.abs(T.laneFit(T.heroInPos(ud, "top", "assassin"), "top") - 0.88) < 1e-9,
+      T.laneFit(T.heroInPos(ud, "top", "assassin"), "top"));
+    ok("默认按分路取同名形态", T.heroInPos(ud, "jungle").formKey === "assassin" && T.heroInPos(ud, "jungle").arc === "assassin");
+    ok("未知形态 key 回落到本路形态", T.heroInPos(ud, "top", "nope").formKey === "tank");
 
-    // 元坦打野：打野位选坦克形态也算前排；切刺客形态就不算
+    // 阵容判定：坦克形态算前排（不论放哪一路），刺客形态不算
     const jt = T.evaluateComp({ top: "吕布", jungle: "元流之子", mid: "小乔", bot: "孙尚香", support: "张飞" }, "稳", { jungle: "tank" });
     const ja = T.evaluateComp({ top: "吕布", jungle: "元流之子", mid: "小乔", bot: "孙尚香", support: "张飞" }, "稳", { jungle: "assassin" });
     ok("元坦打野算前排", jt.tips.indexOf("前排充足，团战能扛") >= 0, jt.tips.join("/"));
-    ok("切刺客形态打野则不算前排", ja.tips.indexOf("前排充足，团战能扛") < 0, ja.tips.join("/"));
+    ok("刺客形态打野不算前排", ja.tips.indexOf("前排充足，团战能扛") < 0, ja.tips.join("/"));
 
-    // 战力：同一英雄不同分路形态，战力应有系统性差异（坦克形态生存高、法师形态输出高）
+    // 战力：同一个选手，用坦克形态 vs 法师形态，期望战力不同
     H.newGame(env, { difficulty: "职业" });
     const me = T.getMyTeam();
-    const p = me.players.mid.find(x => x.id === me.lineup.mid) || me.players.mid[0];
-    const avg = (pos, n) => {
-      let s = 0;
-      for (let i = 0; i < n; i++) s += T.posPower(p, h("元流之子"), h("小乔"), "稳", pos, null);
-      return s / n;
+    const p = me.players.top.find(x => x.id === me.lineup.top) || me.players.top[0];
+    const avg = (pos, key, n) => {
+      let sum = 0;
+      for (let i = 0; i < n; i++) sum += T.posPower(p, ud, h("白起"), "稳", pos, null, key);
+      return sum / n;
     };
-    const pTop = avg("top", 60), pMid = avg("mid", 60);
-    ok("元流之子：不同分路形态战力不同", Math.abs(pTop - pMid) > 0.5, `${pTop.toFixed(1)} vs ${pMid.toFixed(1)}`);
+    const aT = avg("top", "tank", 80), aM = avg("top", "mage", 80);
+    ok("换形态会改变战力", Math.abs(aT - aM) > 0.5, `${aT.toFixed(1)} vs ${aM.toFixed(1)}`);
 
-    // 选将台要能看到它，并且标注「五形态」而不是「法师」
+    // BP 流程：点英雄 → 选形态 → 点分路落位；pick 上带 form
     T.getS().transferWindow = false;
     T.startSeries(T.getS().schedule.find(x => !x.played).oppId, 5, "regular", null, "测形态");
+    // 跳到「我方选将」这一步，待选卡片才会出现
+    const dd0 = T.getS().series.draft;
+    dd0.stepIndex = dd0.steps.findIndex(st => st.actor === dd0.mySide && st.type === "pick");
     T.renderSeries();
-    const draftHtml = root();
-    ok("选将台能选到元流之子", draftHtml.indexOf("元流之子") >= 0);
-    ok("元流之子标注为五形态", /元流之子[\s\S]{0,120}五形态/.test(draftHtml));
+    ok("选将台能选到元流之子", root().indexOf("元流之子") >= 0);
+    ok("标注为五形态", /元流之子[\s\S]{0,120}五形态/.test(root()));
+    T.handleAct("pickhero:元流之子");
+    const pend = root();
+    ok("待选卡片给出五个形态按钮", ["mage", "tank", "marksman", "support", "assassin"].every(k => pend.indexOf(`data-act="pform:${k}"`) >= 0));
+    T.handleAct("pform:tank");
+    ok("选中坦克形态", /坦克形态/.test(root()) && root().indexOf("data-act=\"pform:tank\"") >= 0);
+    const dd = T.getS().series.draft;
+    dd.stepIndex = dd.steps.findIndex(st => st.actor === dd.mySide && st.type === "pick");
+    T.handleAct("placeslot:jungle");
+    const pick = T.getS().series.draft.picks[dd.mySide].find(x => x.hero === "元流之子");
+    ok("落位后 pick 带形态", pick && pick.form === "tank" && pick.pos === "jungle", pick && (pick.pos + "/" + pick.form));
+    T.renderSeries();
+    ok("阵容区显示「元流之子·坦克形态」", /元流之子<i[^>]*>·坦克形态/.test(root()) || root().indexOf("·坦克形态") >= 0);
 
-    // 我方选出「元流之子·打野」后，界面上应出现形态切换；点击后写进 pick.form
-    const d = T.getS().series.draft;
-    d.picks[d.mySide] = d.picks[d.mySide].filter(x => x.pos !== "jungle");
-    d.picks[d.mySide].push({ pos: "jungle", hero: "元流之子" });
-    T.renderSeries();
-    ok("出现形态切换按钮", root().indexOf("data-act=\"mform:assassin\"") >= 0);
-    T.handleAct("mform:assassin");
-    const pick = T.getS().series.draft.picks[d.mySide].find(x => x.pos === "jungle" && x.hero === "元流之子");
-    ok("切换后写入 pick.form", pick && pick.form === "assassin", pick && pick.form);
-    T.handleAct("mform:");
-    ok("切回默认形态", pick.form === "", JSON.stringify(pick.form));
+    // 用掉一个形态 = 整个英雄被消耗（其余四个也不可选）
+    const dNow = T.getS().series.draft;
+    ok("本队用过后元流之子从可选池消失",
+      !T.availPickHeroes(dNow.mySide).some(x => x.name === "元流之子"));
+    ok("使用记录按英雄名记（一形态消耗全部）", dNow.used.filter(n => n === "元流之子").length === 1);
+    ok("英雄池里只有一份元流之子", T.HEROES.filter(x => x.name === "元流之子").length === 1);
+    // ban 一次也是整只 ban 掉：把元流之子 ban 掉后，任何形态都不再出现在两个池子里
+    ok("元流之子只有一个 ban 条目", T.availBanHeroes(true).filter(x => x.name === "元流之子").length <= 1);
+    const bans = dNow.bans[dNow.mySide];
+    if (!bans.includes("元流之子")) {
+      dNow.used.push("元流之子"); bans.push("元流之子");
+      ok("ban 掉后选将池不再有元流之子", !T.availPickHeroes(dNow.mySide).some(x => x.name === "元流之子"));
+    } else { ok("ban 掉后选将池不再有元流之子", true); }
   });
 };

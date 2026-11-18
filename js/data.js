@@ -184,11 +184,13 @@ const HERO_FLEX = {
   鬼谷子: { mid: 0.86 }, 东皇太一: { top: 0.90, jungle: 0.80 }, 盾山: { top: 0.86 },
   刘禅: { top: 0.92 }, 太乙真人: { top: 0.82 }, 苏烈: { top: 0.93, jungle: 0.86 }, 钟馗: { mid: 0.88, top: 0.82, jungle: 0.80 },
   桑启: { mid: 0.85 }, 朵莉亚: { mid: 0.85 }, 少司缘: { mid: 0.85 }, 赵怀真: { top: 0.88, jungle: 0.90 },
-  大禹: { top: 0.94 }, 空空儿: { mid: 0.86 }, 元流之子: { top: 1, jungle: 1, bot: 1, support: 1 }
+  大禹: { top: 0.94 }, 空空儿: { mid: 0.86 }
 };
 function laneFit(hero, pos) {
   if (!hero) return 1;
   if (hero.pos === pos) return 1.0;
+  // 多形态英雄的某个形态可以有自己的摇摆（如元坦打野），优先用它
+  if (hero.flex && hero.flex[pos] != null) return hero.flex[pos];
   const f = HERO_FLEX[hero.name];
   return (f && f[pos] != null) ? f[pos] : 0.72;
 }
@@ -249,39 +251,53 @@ function heroTraitNote(hero, oppHero) {
    所有涉及 arc / 四维的计算都要先过 heroInPos(hero, pos)。 */
 const HERO_FORMS = {
   元流之子: {
-    mid:     { arc: "mage",     o: 82, s: 50, c: 62, m: 58, label: "法师形态", lane: "中路" },
-    top:     { arc: "tank",     o: 58, s: 90, c: 72, m: 52, label: "坦克形态", lane: "对抗路" },
-    // 打野位：元坦打野是赛事主流（前排 + 团控），所以默认坦克形态，另可切刺客形态打野
-    jungle:  { arc: "tank",     o: 58, s: 90, c: 72, m: 52, label: "坦克形态", lane: "打野",
-               alts: [{ key: "assassin", arc: "assassin", o: 86, s: 58, c: 45, m: 84, label: "刺客形态", lane: "打野" }] },
-    bot:     { arc: "marksman", o: 84, s: 48, c: 55, m: 62, label: "射手形态", lane: "发育路" },
-    support: { arc: "support",  o: 54, s: 76, c: 84, m: 62, label: "辅助形态", lane: "游走" }
+    mage:     { arc: "mage",     o: 82, s: 50, c: 62, m: 58, label: "法师形态", pos: "mid", flex: {} },
+    // 元坦打野是赛事主流，所以坦克形态额外给一条打野摇摆
+    tank:     { arc: "tank",     o: 58, s: 90, c: 72, m: 52, label: "坦克形态", pos: "top", flex: { jungle: 0.95 } },
+    marksman: { arc: "marksman", o: 84, s: 48, c: 55, m: 62, label: "射手形态", pos: "bot", flex: {} },
+    support:  { arc: "support",  o: 54, s: 76, c: 84, m: 62, label: "辅助形态", pos: "support", flex: {} },
+    assassin: { arc: "assassin", o: 86, s: 58, c: 45, m: 84, label: "刺客形态", pos: "jungle", flex: { top: 0.88 } }
   }
 };
-/* formKey 用于「同一分路可选形态」（目前只有元流之子打野：坦克 / 刺客），不传则用默认形态 */
-function heroFormOf(hero, pos, formKey) {
+const FORM_ORDER = ["mage", "tank", "marksman", "support", "assassin"];
+/* 某英雄的全部可选形态（BP 选将时挑一个，挑完当一个正常英雄放进任意分路） */
+function heroFormList(hero) {
   const forms = hero && HERO_FORMS[hero.name];
-  const f = (forms && forms[pos]) || null;
-  if (!f || !formKey) return f;
-  const alt = (f.alts || []).find(a => a.key === formKey);
-  return alt || f;
+  if (!forms) return [];
+  return FORM_ORDER.filter(k => forms[k]).map(k => Object.assign({ key: k }, forms[k]));
 }
-/* 按分路取"形态后的英雄"：没有多形态的返回原对象（不产生额外开销） */
+/* 按形态 key 取形态；不传 key 时回落到「与该分路同名的形态」（方便直接点分路落位） */
+function heroFormOf(hero, formKey) {
+  const forms = hero && HERO_FORMS[hero.name];
+  if (!forms) return null;
+  if (formKey && forms[formKey]) return Object.assign({ key: formKey }, forms[formKey]);
+  return null;
+}
+function heroFormForPos(hero, pos) {
+  const forms = hero && HERO_FORMS[hero.name];
+  if (!forms) return "";
+  const hit = FORM_ORDER.find(k => forms[k] && forms[k].pos === pos);
+  return hit || "";
+}
+/* 按（分路, 形态）取"形态后的英雄"：返回对象的 pos 是**形态自己的分路**，
+   所以放进别的分路会被 laneFit 判定为逆用（和普通英雄一样吃分路不匹配惩罚）。 */
 function heroInPos(hero, pos, formKey) {
-  const f = heroFormOf(hero, pos, formKey);
-  if (!f) return hero;
-  return { name: hero.name, pos: pos, arc: f.arc, o: f.o, s: f.s, c: f.c, m: f.m, formLabel: f.label, formKey: f.key || null };
+  const forms = hero && HERO_FORMS[hero.name];
+  if (!forms) return hero;
+  const key = (formKey && forms[formKey]) ? formKey : (heroFormForPos(hero, pos) || "mage");
+  const f = forms[key];
+  return { name: hero.name, pos: f.pos, arc: f.arc, o: f.o, s: f.s, c: f.c, m: f.m, flex: f.flex || {}, formLabel: f.label, formKey: key };
 }
 function heroFormLabel(hero, pos, formKey) {
-  const f = heroFormOf(hero, pos, formKey);
-  return f ? f.label : "";
-}
-/* 该英雄在这个分路有哪几种形态可选（默认 + 备选），用于 BP 界面切换 */
-function heroFormChoices(hero, pos) {
   const forms = hero && HERO_FORMS[hero.name];
-  const f = (forms && forms[pos]) || null;
-  if (!f || !f.alts || !f.alts.length) return [];
-  return [{ key: "", label: f.label }].concat(f.alts.map(a => ({ key: a.key, label: a.label })));
+  if (!forms) return "";
+  const key = (formKey && forms[formKey]) ? formKey : "";
+  return key ? forms[key].label : heroFormLabelOf(hero, pos);
+}
+function heroFormLabelOf(hero, pos) {
+  const k = heroFormForPos(hero, pos);
+  const forms = hero && HERO_FORMS[hero.name];
+  return (k && forms) ? forms[k].label : "";
 }
 function heroHasForms(hero) { return !!(hero && HERO_FORMS[hero.name]); }
 function fitLabel(fit) {

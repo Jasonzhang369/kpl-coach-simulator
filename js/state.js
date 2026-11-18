@@ -152,7 +152,7 @@ function openGuide(force) {
     ["快捷键", "<b>1~8</b> 切页签 · <b>/</b> 搜索英雄 · <b>B</b> 一键 BP · <b>S</b> 跳过战斗 · <b>R</b> 一键轮换 · <b>?</b> 帮助 · <b>Esc</b> 关弹窗。"],
     ["坦野", "可野坦克（阿古朵/猪八戒/夏侯惇/赵怀真/苏烈/程咬金…）比刺客少，但每个打野选手的初始英雄池<b>保底有 1 个</b>可用坦野——阵容判定要求<b>前排 ≥2</b>，坦野是凑第二个前排最省资源的路子。"],
     ["英雄特性", "个别英雄有机制特性，不占四维却影响对位：<b>庄周</b>大招解控，对<b>控制型英雄</b>（控制 ≥65）额外 +6% 战力，专门克制硬控先手体系。"],
-    ["五形态", "<b>元流之子</b>是五形态英雄：选他在哪一路，就按那一路的形态结算（中路法师 / 对抗坦克 / 打野坦克 / 发育射手 / 游走辅助），五路都算主场。<b>打野默认坦克形态</b>（元坦打野是主流），BP 时可在面板上切<b>刺客形态</b>——形态不同，四维、战力与阵容判定都会变（只有坦克形态算前排）。"],
+    ["五形态", "<b>元流之子</b>是五形态英雄：BP 选到他时，卡片上会出现<b>法师 / 坦克 / 射手 / 辅助 / 刺客</b>五个形态按钮，先挑一个形态，再像普通英雄一样点<b>任意分路</b>落位。形态决定四维与定位（坦克形态才算前排），放到非本命分路照样吃逆用惩罚。<b>ban 一次就整只禁用；用掉任一形态后，其余四个本队都不能再选。</b>"],
     ["手机操作", "页签在<b>屏幕底部</b>，随时可点。BP 不能拖拽，改成 <b>点英雄 → 再点分路</b> 两步；积分榜可左右滑动看完整数据。"]
   ];
   mask.innerHTML = `<div class="modal guide-modal">
@@ -329,7 +329,10 @@ function handleSlotClick(pos) {
     swapSlots(S._swapFrom, pos); S._swapFrom = null; render(); return;
   }
   const hero = S._pendingHero;
-  if (hero) { draftPick(pos, hero); S._pendingHero = null; }
+  if (hero) {
+    draftPick(pos, hero, S._pendingForm);
+    S._pendingHero = null; S._pendingForm = null;
+  }
 }
 function swapSlots(a, b) {
   const s = S.series, d = s.draft; if (!d) return;
@@ -394,18 +397,12 @@ function handleAct(act) {
   if (cmd === "startmatch") { startMatch(); return; }
   if (cmd === "ban") { draftBan(args[0]); return; }
   if (cmd === "pick") { draftPick(args[0], args[1]); return; }
-  if (cmd === "pickhero") { S._pendingHero = (S._pendingHero === args[0]) ? null : args[0]; render(); return; }
-  if (cmd === "mform") {
-    // 多形态英雄（元流之子）在某一路的形态切换："" = 默认形态
-    const s = S.series; if (!s || !s.draft) return;
-    const d = s.draft;
-    const e = d.picks[d.mySide].find(x => { const h = heroByName(x.hero); return h && heroHasForms(h) && heroFormChoices(h, x.pos).length; });
-    if (!e) { toast("还没有选出可切换形态的英雄"); return; }
-    e.form = args[0] || "";
-    save(); render();
-    toast(`${e.hero}（${POS_NAME[e.pos]}）形态：${heroFormLabel(heroByName(e.hero), e.pos, e.form)}`);
-    return;
+  if (cmd === "pickhero") {
+    S._pendingHero = (S._pendingHero === args[0]) ? null : args[0];
+    S._pendingForm = null;                 // 换英雄时清掉上一次选的形态
+    render(); return;
   }
+  if (cmd === "pform") { S._pendingForm = args[0] || null; render(); return; }
   if (cmd === "placeslot") { handleSlotClick(args[0]); return; }
   if (cmd === "battleskip") { skipBattle(); return; }
   if (cmd === "startbattle") { const s = S.series; if (s && s.sub === "preview") { s.sub = "battle"; startBattleTick(); save(); render(); } return; }
