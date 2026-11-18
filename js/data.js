@@ -388,7 +388,8 @@ const POOL = [
   { name: "恒心", pos: "top", rating: "C", ovr: 73 },
   { name: "风行", pos: "top", rating: "C", ovr: 72 },
   { name: "光明", pos: "top", rating: "A", ovr: 83 },  // 2026夏最佳对抗路候选（北京JDG）
-  { name: "文涛", pos: "top", rating: "B", ovr: 76 },   // 重庆狼队 边路
+  { name: "文涛", pos: "top", rating: "B", ovr: 76 },  // 重庆狼队 边路
+  { name: "无言", pos: "top", rating: "A", ovr: 86 },   // 2026春冠军KSG核心边路（战坦双修）
 
   // ===== 打野 =====
   { name: "小胖", pos: "jungle", rating: "S", ovr: 94 },  // 2026夏决FMVP，史上首位代表不同俱乐部拿决赛MVP
@@ -418,8 +419,9 @@ const POOL = [
   { name: "安七", pos: "jungle", rating: "C", ovr: 74 },
   { name: "书源", pos: "jungle", rating: "A", ovr: 83 },  // 2026夏最佳打野候选（长沙TES.A）
   { name: "米苏", pos: "jungle", rating: "B", ovr: 77 },  // 杭州LGD.NBW 打野
-  { name: "果冻", pos: "jungle", rating: "B", ovr: 76 },  // 北京WB 打野轮换
-  { name: "航航", pos: "jungle", rating: "B", ovr: 76 },   // 上海RNG.M 打野
+  { name: "航航", pos: "jungle", rating: "B", ovr: 76 },  // 上海RNG.M 打野
+  { name: "小小阳", pos: "jungle", rating: "A", ovr: 82 },  // 佛山DRG 打野（2026夏首发）
+  { name: "安凉", pos: "jungle", rating: "B", ovr: 78 },   // 北京WB 打野轮换
 
   // ===== 中路 =====
   { name: "清融", pos: "mid", rating: "S", ovr: 92 },  // 2026年总亚军JDG核心，十大年度记忆人物
@@ -452,9 +454,12 @@ const POOL = [
   { name: "小晗", pos: "mid", rating: "C", ovr: 74 },     // 济南RW侠
   { name: "许诺", pos: "mid", rating: "C", ovr: 74 },
   { name: "老帅", pos: "mid", rating: "C", ovr: 74 },      // AG 首冠成员（现已淡出）
-  { name: "冰尘", pos: "mid", rating: "C", ovr: 73 },
-  { name: "七", pos: "mid", rating: "A", ovr: 82 },  // 2026夏最佳中路候选（长沙TES.A）
-  { name: "向鱼", pos: "mid", rating: "B", ovr: 78 },   // 中路老将
+    { name: "向鱼", pos: "mid", rating: "B", ovr: 78 },  // 中路老将
+  { name: "柚子", pos: "mid", rating: "A", ovr: 82 },  // 佛山DRG 中路（2026夏首发）
+  { name: "清弦", pos: "mid", rating: "B", ovr: 79 },  // 南通Hero 中路（2026夏引进）
+  { name: "玖熙", pos: "mid", rating: "B", ovr: 78 },  // 南通Hero 中路
+  { name: "果冻", pos: "mid", rating: "B", ovr: 76 },  // 北京WB 中路轮换
+  { name: "七", pos: "mid", rating: "A", ovr: 82 },   // 2026夏最佳中路候选（长沙TES.A）
 
   // ===== 发育路 =====
   { name: "一诺", pos: "bot", rating: "S", ovr: 95 },  // 7冠 + 2025年总FMVP（戈娅）
@@ -488,7 +493,10 @@ const POOL = [
   { name: "SILVER", pos: "bot", rating: "B", ovr: 79 },   // 南京Hero久竞（黄本帅）
   { name: "墨衍", pos: "bot", rating: "C", ovr: 74 },  // 南京Hero久竞
   { name: "小寒", pos: "bot", rating: "A", ovr: 84 },  // 2026夏最佳发育路候选（北京JDG）
-  { name: "钎城", pos: "bot", rating: "B", ovr: 79 },   // 发育路老将
+  { name: "钎城", pos: "bot", rating: "B", ovr: 79 },  // 发育路老将
+  { name: "小屿", pos: "bot", rating: "A", ovr: 84 },  // 2026春冠军KSG射手
+  { name: "昭珏", pos: "bot", rating: "A", ovr: 83 },  // 北京WB 主力射手（2026夏引进）
+  { name: "奕雨", pos: "bot", rating: "B", ovr: 76 },   // 北京WB 发育路轮换
 
   // ===== 游走（辅助） =====
   { name: "大帅", pos: "support", rating: "S", ovr: 92 },  // 2025夏决FMVP，史上第二位辅助FMVP
@@ -522,59 +530,62 @@ const POOL = [
   { name: "涛", pos: "support", rating: "C", ovr: 74 },
   { name: "无铭", pos: "support", rating: "C", ovr: 73 },  // eStar（现转教练）
   { name: "涵", pos: "support", rating: "A", ovr: 84 },  // 2026夏冠军TTG游走，钟馗绝活
-  { name: "月月", pos: "support", rating: "B", ovr: 76 },   // 2026夏冠军TTG游走替补
+  { name: "月月", pos: "support", rating: "B", ovr: 76 },  // 2026夏冠军TTG游走替补
+  { name: "白清", pos: "support", rating: "B", ovr: 80 },  // 南通Hero 游走
+  { name: "小碎", pos: "support", rating: "B", ovr: 80 },  // 上海EDG.M 游走（2026首发）
+  { name: "冰尘", pos: "support", rating: "C", ovr: 73 },   // 杭州LGD.NBW 游走
 ];
 
-// 「真实难度」专用：12 支战队的真实大名单（以 2025 KPL 年度总决赛/挑战者杯/夏季赛大名单为准，
+// 「真实难度」专用：12 支战队的真实大名单（以 2026 KPL 夏季赛/年度总决赛大名单为准，
 // 个别位置按夏季赛补齐；转会期流动以最近一次名单归属为准）。首发=名单首个，其余为替补。
 const REAL_ROSTERS = {
   "成都AG超玩会": {
-    top: ["轩染", "坦然", "北诗"], jungle: ["钟意"],
-    mid: ["长生", "小凡"], bot: ["一诺", "小俞"], support: ["大帅"]
+    top: ["轩染", "北诗"], jungle: ["钟意"],
+    mid: ["长生"], bot: ["一诺", "小麦"], support: ["大帅"]
   },
   "武汉eStarPro": {
-    top: ["誓约"], jungle: ["花海", "小楼", "余忆"],
-    mid: ["Ming"], bot: ["亮宇"], support: ["紫渊"]
+    top: ["Fly"], jungle: ["小楼", "余忆"],
+    mid: ["Ming"], bot: ["亮宇"], support: ["小A"]
   },
   "重庆狼队": {
-    top: ["归期", "樱花"], jungle: ["小胖"],
-    mid: ["紫幻"], bot: ["道崽"], support: ["一笙", "信"]
+    top: ["清清", "文涛"], jungle: ["皖皖"],
+    mid: ["紫幻"], bot: ["道崽"], support: ["信"]
   },
   "北京WB": {
-    top: ["梓墨", "䲷龙"], jungle: ["暖阳"],
-    mid: ["听悦"], bot: ["小麦", "乔兮"], support: ["梦溪", "晚星"]
+    top: ["梓墨", "樱花"], jungle: ["暖阳", "安凉"],
+    mid: ["听悦", "果冻"], bot: ["昭珏", "奕雨"], support: ["一笙", "阿豆"]
   },
   "佛山DRG": {
-    top: ["花缘"], jungle: ["皖皖", "阿改"],
-    mid: ["早点"], bot: ["梦岚"], support: ["四宝", "久酷"]
+    top: ["花缘"], jungle: ["小小阳"],
+    mid: ["柚子", "早点"], bot: ["梦岚"], support: ["子阳", "源"]
   },
   "上海EDG.M": {
-    top: ["小泽"], jungle: ["夏凌", "初晨"],
-    mid: ["花卷"], bot: ["凌云", "鸣鸣"], support: ["帆帆", "笑影"]
+    top: ["流星"], jungle: ["夏凌"],
+    mid: ["花卷"], bot: ["风箫", "凌云"], support: ["小碎"]
   },
   "广州TTG": {
-    top: ["清清", "小困"], jungle: ["佳心", "落尘"],
-    mid: ["鹤辞"], bot: ["小雪"], support: ["玖欣", "涛"]
+    top: ["萝卜", "小泽"], jungle: ["小胖", "佳心"],
+    mid: ["鹤辞"], bot: ["小雪"], support: ["涵", "月月"]
   },
   "苏州KSG": {
-    top: ["萝卜", "流星"], jungle: ["句号"],
-    mid: ["流浪"], bot: ["妖刀", "卡密望"], support: ["子阳", "九幽", "啊泽"]
+    top: ["无言"], jungle: ["句号"],
+    mid: ["流浪", "小凡"], bot: ["小屿"], support: ["晚星", "九幽"]
   },
-  "南京Hero久竞": {
-    top: ["栋栋", "景晚"], jungle: ["小义"],
-    mid: ["景诗", "铃铛"], bot: ["SILVER", "墨衍"], support: ["阿豆"]
+  "南通Hero久竞": {
+    top: ["坦然"], jungle: ["落尘"],
+    mid: ["清弦", "玖熙"], bot: ["妖刀", "SILVER"], support: ["白清", "紫渊"]
   },
   "北京JDG": {
-    top: ["轻语"], jungle: ["今屿"],
-    mid: ["清融"], bot: ["绝意", "零栩", "小玖"], support: ["无畏"]
+    top: ["轻语", "光明"], jungle: ["无双"],
+    mid: ["清融"], bot: ["小寒"], support: ["无畏"]
   },
-  "杭州LGD.NW": {
-    top: ["小落", "花花"], jungle: ["小白熊", "赤辰"],
-    mid: ["小名", "九尾"], bot: ["小久", "小涵"], support: ["小崽"]
+  "杭州LGD.NBW": {
+    top: ["小落", "花花"], jungle: ["米苏", "赤辰"],
+    mid: ["九尾", "小名"], bot: ["小久", "小涵"], support: ["小崽", "冰尘"]
   },
   "济南RW侠": {
-    top: ["Fly", "梓轩", "小度"], jungle: ["无双"],
-    mid: ["见月", "小晗"], bot: ["秋源"], support: ["小A"]
+    top: ["归期"], jungle: ["今屿"],
+    mid: ["挽墨"], bot: ["小俞", "佩恩"], support: ["梦溪"]
   }
 };
 // 按真实大名单构建 12 队（同一选手只会属于一支队；未上名单的真实选手进自由身池）

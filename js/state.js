@@ -510,8 +510,8 @@ function ngModalHtml() {
     <div class="hero-opt">${diffBtn("新秀")}${diffBtn("职业")}${diffBtn("传奇")}<button class="btn ghost sm" data-act="seldiffrand" aria-label="随机难度">🎲 随机</button></div>
     <div class="muted" style="font-size:12px;margin:6px 0 12px;line-height:1.6">${diffTip}</div>
     <div class="muted mb">名单模式（当前：<b style="color:var(--gold)">${ng.rosterMode === "real" ? "真实大名单" : "平衡选秀"}</b>）：</div>
-    <div class="hero-opt mb">${rosterBtn("draft", "平衡选秀", "蛇形分配，各队战力接近")}${rosterBtn("real", "真实大名单", "按 2025 KPL 名单绑定，强队更强")}</div>
-    <div class="muted" style="font-size:12px;margin-bottom:10px">${ng.rosterMode === "real" ? "真实名单：12 队按 <b>2025 KPL 真实大名单</b>绑定首发/替补（强队更强、不平均分配）。<b>该名单下对手 BP 水平固定按「传奇」处理</b>（与所选难度无关）。" : "平衡选秀：按总评蛇形分配（每队一强一弱），各队开局战力接近；对手 BP 水平按上面的难度决定。"}</div>
+    <div class="hero-opt mb">${rosterBtn("draft", "平衡选秀", "蛇形分配，各队战力接近")}${rosterBtn("real", "真实大名单", "按 2026 KPL 名单绑定，强队更强")}</div>
+    <div class="muted" style="font-size:12px;margin-bottom:10px">${ng.rosterMode === "real" ? "真实名单：12 队按 <b>2026 KPL 大名单</b>绑定首发/替补（强队更强、不平均分配）。<b>该名单下对手 BP 水平固定按「传奇」处理</b>（与所选难度无关）。" : "平衡选秀：按总评蛇形分配（每队一强一弱），各队开局战力接近；对手 BP 水平按上面的难度决定。"}</div>
     <div class="muted mb">选择战队（当前：<b style="color:var(--gold)">${teamNow}</b>）：</div>
     <div class="hero-opt" style="max-height:150px;overflow:auto">
       <button class="btn ghost sm ${ng.teamName === "" ? 'gold' : ''}" data-act="selrandom" aria-label="随机战队">🎲 随机战队</button>
