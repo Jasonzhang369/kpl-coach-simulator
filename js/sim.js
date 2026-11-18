@@ -164,15 +164,18 @@ function freeAgentEntry(pos) { return choice(POOL.filter(p => p.pos === pos)); }
 const BP_LEVELS = {
   新秀: {
     name: "新秀", noise: 0.24, topN: 5, profW: 0.50, fitW: 0.78, counterW: 0.22,
-    compAware: false, banPoolN: 8, banRandom: 0.85, banUseThreat: false, peakTopN: 4
+    compAware: false, banPoolN: 8, banRandom: 0.85, banUseThreat: false, peakTopN: 4,
+    searchDepth: 0, searchK: 0
   },
   职业: {
     name: "职业", noise: 0.18, topN: 4, profW: 0.85, fitW: 0.85, counterW: 0.85,
-    compAware: true, banPoolN: 4, banRandom: 0.25, banUseThreat: true, peakTopN: 3
+    compAware: true, banPoolN: 4, banRandom: 0.25, banUseThreat: true, peakTopN: 3,
+    searchDepth: 1, searchK: 6      // 会算你一步应手
   },
   传奇: {
     name: "传奇", noise: 0.08, topN: 2, profW: 1.0, fitW: 1.0, counterW: 0.96,
-    compAware: true, banPoolN: 2, banRandom: 0.03, banUseThreat: true, peakTopN: 1
+    compAware: true, banPoolN: 2, banRandom: 0.03, banUseThreat: true, peakTopN: 1,
+    searchDepth: 2, searchK: 8      // 算两步：我选 → 你应对 → 我再选
   }
 };
 function aiBpLevel() {
@@ -695,6 +698,98 @@ function scoutDecay() {
   });
 }
 /* 玩家最可能拿来克制我这一手的价值（用于选将时预判） */
+/* ---------------- BP 搜索（A）与对手预测（B） ----------------
+   A：把 ban/pick 当博弈树，对我方每一手做「我选 → 你最佳应手（→ 我再选）」的极小极大搜索，
+      评估函数 = 双方阵容期望战力之差（含前排/输出/控制的结构分）。
+      深度由难度决定（新秀 0 / 职业 1 / 传奇 2），候选按强度×熟练度剪到 K 个。 */
+function bpEvalSide(list) {
+  const used = new Set();
+  const slots = [];
+  (list || []).forEach(e => {
+    const h = heroByName(e.hero); if (!h) return;
+    let best = null;
+    POS.forEach(pos => {
+      if (used.has(pos)) return;
+      const hl = heroInPos(h, pos, e.form);
+      const v = heroStrength(hl) * laneFit(hl, pos) * POS_WEIGHT[pos];
+      if (!best || v > best.v) best = { pos, v, hl };
+    });
+    if (!best) return;
+    used.add(best.pos); slots.push(best);
+  });
+  const total = slots.reduce((a, s) => a + s.v, 0);
+  const front = slots.filter(s => s.hl.arc === "tank" || s.hl.arc === "support").length;
+  const dmg = slots.filter(s => ["mage", "marksman", "assassin", "fighter"].includes(s.hl.arc)).length;
+  const cc = slots.filter(s => s.hl.c >= 70).length;
+  let mult = 1;
+  if (front >= 2) mult += 0.03; else if (front === 1) mult += 0.005; else mult -= 0.03;
+  if (dmg >= 3) mult += 0.02; else mult -= 0.02;
+  if (cc >= 2) mult += 0.02;
+  return total * mult;
+}
+/* 某一方的候选英雄（按强度×队内最擅长熟练度排序，剪到 K 个） */
+function bpSideCands(team, pool, K) {
+  const scored = (pool || []).map(h => {
+    const bl = heroBestLane(h);
+    let prof = 1;
+    POS.forEach(pos => {
+      const pl = team ? getPlayer(team, team.lineup[pos]) : null;
+      if (pl) prof = Math.max(prof, profOf(pl, h.name));
+    });
+    return { h, sc: heroStrength(bl.h) * prof };
+  }).sort((a, b) => b.sc - a.sc);
+  return scored.slice(0, Math.max(1, K)).map(x => x.h);
+}
+/* 我选完 h 之后，对手最佳应手造成的「最坏局面」（可选再往下算一手我） */
+function bpWorstAfterMyPick(myPicks, oppPicks, myPool, oppPool, lookahead) {
+  const oppTeam = S.teams.find(t => t.id === S.series.oppId);
+  const oppCands = bpSideCands(oppTeam, oppPool, (aiBpCfg().searchK || 6));
+  if (!oppCands.length) return bpEvalSide(myPicks) - bpEvalSide(oppPicks);
+  let worst = Infinity;
+  oppCands.forEach(oh => {
+    const opp2 = oppPicks.concat([{ hero: oh.name }]);
+    let v;
+    if (lookahead > 0) {
+      const myCands = bpSideCands(getMyTeam(), myPool.filter(x => x.name !== oh.name), (aiBpCfg().searchK || 6));
+      v = -Infinity;
+      myCands.forEach(mh => {
+        const my2 = myPicks.concat([{ hero: mh.name }]);
+        const s2 = bpEvalSide(my2) - bpEvalSide(opp2);
+        if (s2 > v) v = s2;
+      });
+      if (v === -Infinity) v = bpEvalSide(myPicks) - bpEvalSide(opp2);
+    } else {
+      v = bpEvalSide(myPicks) - bpEvalSide(opp2);
+    }
+    if (v < worst) worst = v;
+  });
+  return worst === Infinity ? bpEvalSide(myPicks) - bpEvalSide(oppPicks) : worst;
+}
+/* B：预测玩家下一手会拿谁（球探偏好 × 熟练度 × 强度，归一成概率） */
+function predictPlayerPick(n) {
+  if (!S.series || !S.series.draft) return [];
+  const my = getMyTeam();
+  const pool = availBanHeroes(false);          // 玩家可用的英雄
+  if (!pool.length || !my) return [];
+  const weights = pool.map(h => {
+    const bl = heroBestLane(h);
+    let prof = 1;
+    POS.forEach(pos => {
+      const pl = getPlayer(my, my.lineup[pos]);
+      if (pl) prof = Math.max(prof, profOf(pl, h.name));
+    });
+    const hist = 1 + 0.55 * (scoutOf(h.name).pick || 0);   // 你历史上拿得越多，越可能再拿
+    return { name: h.name, w: heroStrength(bl.h) * prof * hist };
+  });
+  const total = weights.reduce((a, x) => a + x.w, 0) || 1;
+  return weights.map(x => ({ name: x.name, p: x.w / total }))
+    .sort((a, b) => b.p - a.p).slice(0, n || 3);
+}
+/* ban 的价值 = 他有多强（威胁）× 你有多可能拿（预测概率）；probMap = {英雄: 概率} */
+function bpDenyValue(h, probMap) {
+  const p = (probMap && probMap[h.name]) || 0;
+  return myThreatScore(h) * (1 + 1.2 * p);
+}
 function myBestResponseRisk(myHero) {
   if (!myHero) return 0;
   if (!S.series || !S.series.draft) return 0;
@@ -729,19 +824,24 @@ function aiBanHero() {
   const pool = availBanHeroes(false);          // 去掉我方战队已用过的（对 AI 而言是对方）
   if (!pool.length) return null;
   const byStrength = pool.slice().sort((a, b) => heroStrength(b) - heroStrength(a));
-  const byThreat = pool.map(h => ({ h, sc: myThreatScore(h) })).sort((a, b) => b.sc - a.sc).map(x => x.h.name);
+  // 新秀：一半回合只按版本强度 ban（不看我会什么），另一半"凭印象"针对最扎眼的 3 个
   if (!cfg.banUseThreat) {
-    // 新秀：一半回合只按版本强度 ban（不看我会什么）；另一半"凭印象"针对，但只在最扎眼的 3 个里挑
     if (rand() < 0.5) {
-      const n = Math.max(1, Math.min(3, byThreat.length));
-      return byThreat[randInt(0, n - 1)];
+      const byThreat0 = pool.map(h => ({ h, sc: myThreatScore(h) })).sort((a, b) => b.sc - a.sc).map(x => x.h.name);
+      const n0 = Math.max(1, Math.min(3, byThreat0.length));
+      return byThreat0[randInt(0, n0 - 1)];
     }
     const n = Math.max(1, Math.min(cfg.banPoolN, byStrength.length));
     return byStrength[randInt(0, n - 1)].name;
   }
-  const n = Math.max(1, Math.min(cfg.banPoolN, byThreat.length));
+  // 职业/传奇：威胁 × 「你有多可能拿」（预测你的下一手，B）
+  const pred = predictPlayerPick(60);
+  const probMap = {};
+  pred.forEach(x => { probMap[x.name] = x.p; });
+  const ranked = pool.map(h => ({ h, sc: bpDenyValue(h, probMap) })).sort((a, b) => b.sc - a.sc);
+  const n = Math.max(1, Math.min(cfg.banPoolN, ranked.length));
   const idx = (rand() < cfg.banRandom) ? randInt(0, n - 1) : 0;
-  return byThreat[idx];
+  return ranked[idx].h.name;
 }
 // AI 读阵容：缺前排/缺输出/缺控制时，优先补对应定位（仅职业/传奇）
 function aiCompFactor(d, side, hero, pos) {
@@ -834,6 +934,28 @@ function aiPickTurn(st) {
   });
   if (!cands.length) return;
   cands.sort((a, b) => b.sc - a.sc);
+
+  // A：博弈搜索（职业 1 步「我选→你应对」/ 传奇 2 步「我选→你应对→我再选」）
+  // S._bpDepth 是内部调试开关（设 0 可关掉搜索做对照），正常流程不设置
+  const depth = (S && S._bpDepth != null) ? S._bpDepth : (cfg.searchDepth || 0);
+  if (depth > 0) {
+    const K = Math.min(cfg.searchK || 6, cands.length);
+    const myNow = (d.picks[side] || []).slice();
+    const oppNow = (d.picks[d.mySide] || []).slice();
+    const myPool = availPickHeroes(side);
+    const oppPool = availPickHeroes(d.mySide);
+    let best = null;
+    for (let i = 0; i < K; i++) {
+      const h = cands[i].hero;
+      const myNext = myNow.concat([{ hero: h.name }]);
+      const v = bpWorstAfterMyPick(myNext, oppNow, myPool.filter(x => x.name !== h.name), oppPool, depth - 1);
+      const val = v * (1 + cfg.noise * (rand() * 2 - 1));
+      if (!best || val > best.val) best = { hero: h, val };
+    }
+    d.picks[side].push(pickEntry(null, best.hero.name));
+    d.used.push(best.hero.name);
+    return;
+  }
   const n = Math.max(1, Math.min(cfg.topN, cands.length));
   const pick = cands[randInt(0, n - 1)];
   d.picks[side].push(pickEntry(null, pick.hero.name));

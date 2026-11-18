@@ -1026,7 +1026,16 @@ function scoutHintHtml() {
   let lvl = "职业";
   try { lvl = aiBpLevel(); } catch (e) {}
   if (lvl === "新秀") return "";   // 新秀不读球探
-  return `<div class="center" style="font-size:11.5px;color:var(--txt2);margin-bottom:6px">🕵 对手球探（${escapeHtml(lvl)}）：已记录你的招牌 ${list.map(([n, v]) => `<b style="color:var(--gold)">${escapeHtml(n)}</b>（${v.pick} 次 · ${Math.round(v.win / v.pick * 100)}% 胜）`).join("、")} —— 会被优先 ban 或先抢</div>`;
+  // B：AI 对你下一手的预测（只在 BP 阶段显示，让你知道它在赌什么）
+  let predHtml = "";
+  try {
+    if (S.series && S.series.draft && !S.series.draft.over && S.series.sub === "draft") {
+      const p2 = predictPlayerPick(3);
+      // 130 个英雄上概率本身很分散，写百分比是假精确；只报它最看重的三个候选
+      if (p2.length) predHtml = ` <span style="color:var(--cyan)">· 预判你下一手：${p2.map(x => `<b>${escapeHtml(x.name)}</b>`).join("、")}</span>`;
+    }
+  } catch (e) {}
+  return `<div class="center" style="font-size:11.5px;color:var(--txt2);margin-bottom:6px">🕵 对手球探（${escapeHtml(lvl)}）：已记录你的招牌 ${list.map(([n, v]) => `<b style="color:var(--gold)">${escapeHtml(n)}</b>（${v.pick} 次 · ${Math.round(v.win / v.pick * 100)}% 胜）`).join("、")} —— 会被优先 ban 或先抢${predHtml}</div>`;
 }
 function renderSeries() {
   const s = S.series, d = s.draft;

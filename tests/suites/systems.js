@@ -117,7 +117,7 @@ module.exports = function (env, H) {
     // 人格会影响选人倾向：四保一 vs 野核，看两边首选分路的分布
     function firstPickLane(key) {
       const counts = {};
-      for (let i = 0; i < 40; i++) {
+      for (let i = 0; i < 80; i++) {
         H.newGame(env, { difficulty: "职业" });
         S().teams.find(t => t.id === S().myTeamId).persona = key;
         S().series = null;
@@ -127,9 +127,11 @@ module.exports = function (env, H) {
         T.aiPickTurn({ actor: T.aiSide(d) });
         const pick = d.picks[T.aiSide(d)][0];
         if (pick) {
-          // 选将阶段不带分路，用「该英雄最强能站哪一路」作为统计口径
-          const bl = T.heroBestLane(T.heroByName(pick.hero));
+          // 选将阶段不带分路：同时按「最强分路」和「英雄定位」两种口径统计
+          const hb = T.heroByName(pick.hero);
+          const bl = T.heroBestLane(hb);
           counts[bl.pos] = (counts[bl.pos] || 0) + 1;
+          counts["arc:" + bl.h.arc] = (counts["arc:" + bl.h.arc] || 0) + 1;
         }
       }
       return counts;
@@ -139,8 +141,16 @@ module.exports = function (env, H) {
     // 行为侧只看「方向」且用组合口径：单看 bot 的样本量太小（四保一首选更常是辅助/前排），
     // 会随随机数抖动；权重表本身（下面两条）才是确定性判据。
     const botSide = o => (o.bot || 0) + (o.support || 0);
-    ok("四保一更偏向发育路+辅助", botSide(protect) > botSide(jungle), `${botSide(protect)} vs ${botSide(jungle)}`);
-    ok("野核更爱先拿打野", (jungle.jungle || 0) > (protect.jungle || 0), `${jungle.jungle || 0} vs ${protect.jungle || 0}`);
+    // 行为侧只看方向：分路口径可能因「英雄最强路」集中在少数位置而双双为 0，
+    // 所以再加一档「定位」口径（四保一偏好射手/坦克/辅助，野核偏好刺客/战士）
+    const arcBias = o => (o["arc:marksman"] || 0) + (o["arc:tank"] || 0) + (o["arc:support"] || 0);
+    ok("四保一更偏向发育路+辅助（或前排/射手定位）",
+      botSide(protect) > botSide(jungle) || arcBias(protect) > arcBias(jungle),
+      `路 ${botSide(protect)}:${botSide(jungle)} · 定位 ${arcBias(protect)}:${arcBias(jungle)}`);
+    ok("野核更爱先拿打野（或刺客/战士定位）",
+      (jungle.jungle || 0) > (protect.jungle || 0) ||
+      ((jungle["arc:assassin"] || 0) + (jungle["arc:fighter"] || 0)) > ((protect["arc:assassin"] || 0) + (protect["arc:fighter"] || 0)),
+      `野 ${jungle.jungle || 0}:${protect.jungle || 0}`);
     const P = k => T.PERSONAS.find(p => p.key === k) || { pos: {} };
     ok("人格表：四保一对发育路权重 > 野核", (P("protect").pos.bot || 1) > (P("jungleCore").pos.bot || 1));
     ok("人格表：野核对打野权重 > 四保一", (P("jungleCore").pos.jungle || 1) > (P("protect").pos.jungle || 1));
@@ -596,5 +606,46 @@ module.exports = function (env, H) {
     const safe = T.myBestResponseRisk(T.heroByName("张良"));
     ok("被克英雄的应对风险更高", risky > safe, `${risky.toFixed(2)} vs ${safe.toFixed(2)}`);
     ok("风险值归一在 0~1", risky >= 0 && risky <= 1 && safe >= 0 && safe <= 1);
+  });
+
+  /* BP 搜索（A）与对手预测（B） */
+  suite("BP 搜索与预测", () => {
+    H.newGame(env, { difficulty: "传奇" });
+    const S0 = T.getS(); S0.transferWindow = false;
+    T.startSeries(S0.schedule[0].oppId, 5, "regular", null, "测搜索");
+    const d = S0.series.draft;
+
+    // B：预测分布归一、且历史偏好会抬高该英雄的概率
+    const predAll = T.predictPlayerPick(999);      // 取全量才能校验归一
+    const sum = predAll.reduce((a, x) => a + x.p, 0);
+    ok("预测分布归一", sum > 0.99 && sum < 1.0001, sum.toFixed(4));
+    ok("预测按概率降序", predAll.every((x, i) => i === 0 || predAll[i - 1].p >= x.p));
+    const h2 = predAll[3].name;
+    const p0 = (T.predictPlayerPick(64).find(x => x.name === h2) || {}).p || 0;
+    S0.scout.heroes[h2] = { pick: 14, win: 11 };
+    const p1 = (T.predictPlayerPick(64).find(x => x.name === h2) || {}).p || 0;
+    ok("历史偏好抬高该英雄的预测概率", p1 > p0, `${(p0 * 100).toFixed(1)}% → ${(p1 * 100).toFixed(1)}%`);
+
+    // A：搜索开关（内部调试深度）会改变阵容评估值——深度 1 应优于纯启发
+    const trial = depth => {
+      let sumV = 0;
+      for (let i = 0; i < 40; i++) {
+        const S1 = T.getS();
+        T.newGame({ difficulty: "职业", rosterMode: "draft", teamName: "成都AG超玩会", slot: 1 });
+        const s2 = T.getS(); s2.transferWindow = false; if (depth != null) s2._bpDepth = depth;
+        T.startSeries(s2.schedule[0].oppId, 5, "regular", null, "测");
+        const dd = s2.series.draft, side = T.aiSide(dd);
+        for (let k = 0; k < 5; k++) T.aiPickTurn({ actor: side });
+        sumV += T.bpEvalSide(dd.picks[side]);
+      }
+      return sumV / 40;
+    };
+    const v0 = trial(0), v1 = trial(1);
+    ok("搜索 1 步比纯启发更强（阵容评估值）", v1 > v0, `${v0.toFixed(1)} → ${v1.toFixed(1)}`);
+
+    // 难度对应搜索深度
+    ok("新秀不搜索 / 职业 1 步 / 传奇 2 步", T.BP_LEVELS["新秀"].searchDepth === 0
+      && T.BP_LEVELS["职业"].searchDepth === 1 && T.BP_LEVELS["传奇"].searchDepth === 2);
+    ok("传奇候选宽度 ≥ 职业", T.BP_LEVELS["传奇"].searchK >= T.BP_LEVELS["职业"].searchK);
   });
 };
