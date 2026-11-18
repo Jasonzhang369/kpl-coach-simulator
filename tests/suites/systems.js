@@ -361,6 +361,12 @@ module.exports = function (env, H) {
       return S2.series;
     };
     const oppId = S().teams.find(t => t.id !== S().myTeamId).id;
+    // 让租借球员稳定首发且不带伤：否则他受伤会被自动换下，这一场就不计出场（偶发抖动）
+    const ensureStarter = () => {
+      const t = T.getMyTeam();
+      const mv = t.players[pos].find(x => x.loan);
+      if (mv) { t.lineup[pos] = mv.id; mv.status = "ok"; mv.statusRounds = 0; if (mv.st < 60) mv.st = 90; }
+    };
 
     // A) 全程坐板凳打一场 → 不计次
     T.startSeries(oppId, 5, "regular", null, "测·板凳");
@@ -368,17 +374,19 @@ module.exports = function (env, H) {
     ok("坐板凳打完一场不扣次数", S().loans[0] && S().loans[0].roundsLeft === T.LOAN_GAMES, S().loans[0] && S().loans[0].roundsLeft);
 
     // B) 提进首发打一场常规赛 → 扣 1
-    T.getMyTeam().lineup[pos] = moved.id;
+    ensureStarter();
     T.startSeries(oppId, 5, "regular", null, "测·首发1");
     playToOver();
     ok("首发出场 1 场 → 剩余 2", S().loans[0] && S().loans[0].roundsLeft === 2, S().loans[0] && S().loans[0].roundsLeft);
 
     // C) 季后赛也计数
+    ensureStarter();
     T.startSeries(oppId, 7, "playoff", "ub1", "测·季后赛");
     playToOver();
     ok("季后赛出场也扣 1 → 剩余 1", S().loans[0] && S().loans[0].roundsLeft === 1, S().loans[0] && S().loans[0].roundsLeft);
 
     // D) 第 3 次出场 → 到期归队，且不会在系列赛中途被抽走
+    ensureStarter();
     T.startSeries(oppId, 5, "regular", null, "测·首发3");
     // 只打第 1 小局，检查局中没有把人抽走
     let kd = 0;
@@ -647,5 +655,30 @@ module.exports = function (env, H) {
     ok("新秀不搜索 / 职业 1 步 / 传奇 2 步", T.BP_LEVELS["新秀"].searchDepth === 0
       && T.BP_LEVELS["职业"].searchDepth === 1 && T.BP_LEVELS["传奇"].searchDepth === 2);
     ok("传奇候选宽度 ≥ 职业", T.BP_LEVELS["传奇"].searchK >= T.BP_LEVELS["职业"].searchK);
+  });
+
+  /* 回归：巅峰对决（第 7 局）用一键 BP 不能卡死
+     —— steps 为空数组，旧代码先命中「stepIndex >= steps.length」当成选完，
+        结果一个英雄都没选就进排位，画面永远停在选将页。 */
+  suite("巅峰对决一键BP", () => {
+    H.newGame(env, { difficulty: "职业" });
+    const S0 = T.getS(); S0.transferWindow = false;
+    const oppId = S0.teams.find(t => t.id !== S0.myTeamId).id;
+    T.startSeries(oppId, 7, "playoff", "ub1", "测·巅峰");
+    const s = S0.series;
+    // 手工摆成第 7 局（peak）的草稿结构：steps 为空、无 ban、盲选
+    s.draft = {
+      mySide: s.firstSide, phase: "peak", peak: true, steps: [], stepIndex: 0,
+      bans: { blue: [], red: [] }, picks: { blue: [], red: [] }, used: [], tactic: "稳", over: false
+    };
+    s.sub = "draft";
+    ok("巅峰对决草稿成立（steps 为空）", s.draft.peak === true && s.draft.steps.length === 0);
+    let k = 0;
+    while (s.sub === "draft" && k++ < 20) T.autoBpStep();
+    ok("一键BP 能选满 5 个（不会卡死）", s.draft.picks[s.draft.mySide].length === 5, s.draft.picks[s.draft.mySide].length);
+    ok("一键BP 后能进入战前预览", s.sub === "preview" || s.sub === "battle", s.sub);
+    ok("对手盲选也补齐 5 个", s.draft.picks[T.aiSide(s.draft)].length === 5, s.draft.picks[T.aiSide(s.draft)].length);
+    ok("排位后 5 个英雄分属五条分路", new Set(s.draft.picks[s.draft.mySide].map(e => e.pos)).size === 5,
+      s.draft.picks[s.draft.mySide].map(e => e.pos).join("/"));
   });
 };

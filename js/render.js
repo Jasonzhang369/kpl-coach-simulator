@@ -884,14 +884,19 @@ function renderPendingCard(name) {
 }
 
 /* ---------------- 一键 BP ----------------
-   强度刻意设在「新秀 < 一键BP < 职业」之间：会犯一些不致命的判断错误
-   （偶尔放过克制、偶尔随到次优英雄、ban 有时不盯着对面绝活），
-   但不会把英雄塞到不该去的分路（同样遵守 LANE_PICK_FLOOR）。
-   传奇难度（含真实大名单）直接禁用一键 BP，必须手动 ban/选。 */
-/* 一键 BP 的水平：比「职业 AI」更粗糙（判断噪声更大、不补阵容、克制只做到一半），
-   但不会故意牺牲熟练度——熟练度是硬信息，谁都会看；差别在「判断」，不在「明知故犯」。
-   实测阵容质量介于新秀 AI 与职业 AI 之间，对新秀胜率比职业高 ~12pp。 */
-const AUTO_BP = { noise: 0.22, topN: 6, profW: 0.90, fitW: 0.80, counterW: 0.40, banTop: 2, banTargetRate: 0.75 };
+   水平定位：对「职业 AI」五五开（实测 400 局 51%），对新秀约 78%；
+   仍会犯不致命的判断错误（jitter），但不会把英雄塞到不该去的分路（遵守 LANE_PICK_FLOOR）。
+   传奇难度（含真实大名单）直接禁用一键 BP，必须手动 ban/选。
+   mode="eval"：不再按单卡强度排序，而是算「这张牌给我阵容涨多少 − 被对手拿到会涨多少」，
+   相当于一次贪心的边际收益评估；jitter 是判断误差（单位=评估点），用来把手感压到职业同档，
+   而不是无脑最优；evalPool 是参与精算的候选数，topN 是最终抽样的范围。
+   下面 heuristic 分支（noise/profW/counterW/searchDepth）保留可切换，便于对比调参。 */
+const AUTO_BP = {
+  mode: "eval", evalPool: 16, topN: 4, jitter: 14, denyW: 0.45,
+  noise: 0, searchDepth: 0, searchK: 8,
+  profW: 1.00, fitW: 0.90, counterW: 0.95, compAware: true,   // 旧启发式分支的参数（保留可切换）
+  banTop: 2, banTargetRate: 0.85
+};
 function autoBpAllowed() { return aiBpLevel() !== "传奇"; }
 function myAutoBan() {
   if (!autoBpAllowed()) return null;
@@ -935,11 +940,50 @@ function myAutoPick() {
     let sc = heroStrength(bl.h);
     sc *= 1 + (prof - 1) * AUTO_BP.profW;
     sc *= 1 + (counter - 1) * AUTO_BP.counterW;
+    if (AUTO_BP.compAware) sc *= aiCompFactor(d, mySide, h, bl.pos);   // 缺前排/输出/控制就补
     sc *= 1 + AUTO_BP.noise * (rand() * 2 - 1);
     return { hero: h.name, sc };
   });
   if (!cands.length) return null;
   cands.sort((a, b) => b.sc - a.sc);
+
+  // eval 模式：直接按「拿到他给我阵容涨多少 − 被对手拿到对他涨多少」排序
+  if (AUTO_BP.mode === "eval") {
+    const myNow = (d.picks[mySide] || []).slice();
+    const oppNow = (d.picks[oth] || []).slice();
+    const baseMy = bpEvalSide(myNow), baseOpp = bpEvalSide(oppNow);
+    const pool = cands.slice(0, Math.max(4, AUTO_BP.evalPool || 40));   // 先剪枝，再算边际（省算力）
+    const rated = pool.map(x => {
+      const gain = bpEvalSide(myNow.concat([{ hero: x.hero }])) - baseMy;
+      const helpThem = bpEvalSide(oppNow.concat([{ hero: x.hero }])) - baseOpp;
+      // jitter：一键 BP 的判断误差（单位=评估点），越大越像"没细想"
+      const jit = (AUTO_BP.jitter || 0) * (rand() * 2 - 1);
+      return { hero: x.hero, sc: gain - AUTO_BP.denyW * helpThem + jit };
+    }).sort((a, b) => b.sc - a.sc);
+    const n = Math.max(1, Math.min(AUTO_BP.topN, rated.length));
+    return rated[randInt(0, n - 1)];
+  }
+
+  // 浅层搜索：选出「对手最强应手之后仍然最好」的那一手（和职业/传奇 AI 用同一套评估）
+  if (AUTO_BP.searchDepth > 0) {
+    const K = Math.min(AUTO_BP.searchK, cands.length);
+    const myNow = (d.picks[mySide] || []).slice();
+    const oppNow = (d.picks[oth] || []).slice();
+    const myPool = availHeroes();
+    const oppPool = availPickHeroes(oth);
+    let best = null;
+    for (let i = 0; i < K; i++) {
+      const h = cands[i].hero;
+      const v = bpWorstAfterMyPick(
+        myNow.concat([{ hero: h.name }]), oppNow,
+        myPool.filter(x => x.name !== h.name), oppPool,
+        AUTO_BP.searchDepth - 1
+      );
+      const val = v * (1 + AUTO_BP.noise * (rand() * 2 - 1));
+      if (!best || val > best.val) best = { hero: h, val };
+    }
+    if (best) return { hero: best.hero, sc: best.val };   // cands 里存的就是英雄名
+  }
   const n = Math.max(1, Math.min(AUTO_BP.topN, cands.length));
   return cands[randInt(0, n - 1)];
 }
@@ -966,26 +1010,45 @@ function autoBpStep() {
     save(); render();
     return true;
   }
+  // 巅峰对决：steps 是空数组（无 ban、盲选），必须放在「stepIndex >= steps.length」之前判断，
+  // 否则会被当成"已经选完了"直接进排位，5 个英雄一个没选 → 死局
+  if (d.peak) {
+    if (!autoBpAllowed()) return false;
+    const my = d.picks[d.mySide] || [];
+    if (d.over || d.phase === "done") { if (!d.over) beginAssign(); return false; }
+    if (my.length >= 5) { revealPeakPicks(); beginAssign(); return false; }
+    const myT = getMyTeam();
+    const usedNames = new Set(my.map(e => e.hero));
+    const covered = new Set(my.map(e => heroBestLane(heroByName(e.hero)).pos));
+    for (let i = 0; i < POS.length; i++) {
+      const pos = POS[i];
+      if (covered.has(pos)) continue;
+      const list = HEROES.filter(h => h.pos === pos && !usedNames.has(h.name))
+        .map(h => ({ h, sc: peakHeroScore(h, pos, myT) + (AUTO_BP.jitter || 0) * (rand() * 2 - 1) }))
+        .sort((a, b) => b.sc - a.sc);
+      if (!list.length) continue;
+      const k = Math.max(1, Math.min(AUTO_BP.topN || 2, list.length));
+      const chosen = list[randInt(0, k - 1)];
+      draftPick(chosen.h.name, null);
+      return true;
+    }
+    return false;
+  }
   if (d.phase === "done" || d.stepIndex >= d.steps.length) {
     if (!d.over) beginAssign();
     return false;
   }
   const st = d.steps[d.stepIndex];
-  if (d.peak) {
-    const hn = (myAutoPick() || {}).hero;
-    if (!hn) return false;
-    draftPick(hn, null);
-    return true;
-  }
   if (st.type === "ban") {
     const hn = st.actor === d.mySide ? myAutoBan() : aiBanHero(st.actor);
     if (!hn) return false;
     d.bans[st.actor].push(hn); d.used.push(hn);
   } else if (st.actor === d.mySide) {
     const pk = myAutoPick();
-    if (!pk) return false;
+    if (!pk || !pk.hero) return false;
+    const before = d.stepIndex;
     draftPick(pk.hero, null);
-    return true;
+    return d.stepIndex !== before;      // 没真正落子就别报成功，避免动画空转
   } else {
     aiPickTurn(st);
   }
