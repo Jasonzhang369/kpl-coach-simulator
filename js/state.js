@@ -141,12 +141,12 @@ function openGuide(force) {
     ["3", "训练", "每轮补充训练点。特训单个属性（+2~3，23 岁以下再 +1）；练满后花 <b>3 点 + 约 200 万</b>突破上限。别忘了留点数<b>休息</b>回体能。"],
     ["4", "BP", "按官方规则：4 ban + 10 选，红蓝方、后手 Counter、<b>全局 BP</b>（本队用过的英雄后续局不能再选）。<b>先只选英雄</b>——双方各选满 5 个后进入<b>排位阶段</b>，这时才决定谁站哪一路（对手分路开打前不公开），所以能做真正的摇摆。第 7 局是<b>巅峰对决</b>：盲选、无 ban、不受全局 BP 限制。"],
     ["5", "比赛", "常规赛 BO5、季后赛 BO7。赛前先看战力对比，局内事件会真正改变结果；点「跳过战斗」只是快进，不会改变概率。"],
-    ["6", "季后赛", "常规赛<b>前 4</b> 进双败淘汰赛。输了进败者组还有一次机会，总决赛一场定胜负。"],
+    ["6", "季后赛", "常规赛<b>前 10</b> 进双败淘汰赛（前 4 进胜者组，5~10 从败者组打起、输一场即淘汰）。胜者组输一场会掉进败者组，总决赛一场定胜负。"],
     ["7", "长期", "每 3 个赛季 = 1 岁。27 岁起逐季衰退（主要掉操作与体能上限），记得提前培养接班人；合同到期会自动续约或离队。"],
-    ["8", "目标", "每赛季董事会有 KPI（进四强 / 夺冠 / 培养新人），达成给预算和声望，未达成扣。声望归零直接赛季失败。"]
+    ["8", "目标", "每赛季董事会有 KPI（进季后赛 / 夺冠 / 培养新人），达成给预算和声望，未达成扣。声望归零直接赛季失败。"]
   ];
   const tips = [
-    ["一键 BP", "水平<b>与职业教练基本同档</b>（平均五五开）：它会按「这张牌给我阵容涨多少、被对手拿到会不会更赚」来挑，缺前排/缺输出时会补位，也会顺手卡对手。<b>新秀难度可以放心用</b>；职业难度想稳定赢还是得自己动手，传奇难度直接禁用。"],
+    ["一键 BP", "所有难度都能用（含传奇 / 真实大名单）。它会按「这张牌给我阵容涨多少、被对手拿到会不会更赚」来挑，缺前排/缺输出时会补位，也会顺手卡对手。强度：<b>明显强于新秀</b>、<b>和职业五五开</b>、<b>对传奇约四六开（下风）</b>——想稳赢传奇还是得自己 ban/选。"],
     ["体能", "全季会缓慢下滑，需要主动轮换或休息；<b>只有大场打完才能休息</b>，系列赛局间只能用替补换人。"],
     ["熟练度", "每个选手对每个英雄有 0~100 熟练度，直接乘进战力。BP 时英雄上的 ★数字就是熟练度，训练页可以专门练。"],
     ["快捷键", "<b>1~8</b> 切页签 · <b>/</b> 搜索英雄 · <b>B</b> 一键 BP · <b>S</b> 跳过战斗 · <b>R</b> 一键轮换 · <b>?</b> 帮助 · <b>Esc</b> 关弹窗。"],
@@ -208,7 +208,7 @@ function showHelp() {
     ["/", "聚焦英雄搜索框（BP 阶段）"],
     ["方向键", "在英雄列表中移动高亮（↑↓ 跨行、←→ 逐个）"],
     ["Enter", "选择 / 禁用当前高亮的英雄"],
-    ["B", "一键 BP / 停止自动 BP（传奇难度与真实大名单禁用）"],
+    ["B", "一键 BP / 停止自动 BP"],
     ["S", "战斗中跳过（直接看结果）"],
     ["R", "一键轮换建议（首发体能偏低时）"],
     ["Esc", "关闭弹窗 / 取消待放置的英雄"],
@@ -500,18 +500,18 @@ function ngModalHtml() {
   const occupied = slotMeta(ng.slot || 1);
   const diffTip = {
     新秀: "会犯小错：不读你的英雄池、基本不针对克制，偶尔拿舒适英雄；但仍会认分路、挑强英雄。可用一键BP（强度略低于职业）。",
-    职业: "常规教练：会读克制、会照顾自家选手擅长、会补阵容前排与输出。可用一键BP，一键 BP 与它<b>大体五五开</b>，想稳定赢要靠手动。",
-    传奇: "近乎最优：几乎总拿最强解，ban 直指你的核心英雄，选将严丝合缝。<b>该难度禁用一键 BP</b>，必须手动 ban/选。"
+    职业: "常规教练：会读克制、会照顾自家选手擅长、会补阵容前排与输出。一键 BP 与它<b>大体五五开</b>，想稳定赢要靠手动。",
+    传奇: "近乎最优：几乎总拿最强解，ban 直指你的核心英雄，选将严丝合缝。可以用一键 BP，但<b>它只有四成左右胜算</b>，想稳赢必须手动。"
   }[ng.difficulty] || "";
   return `<div class="modal" role="dialog" aria-modal="true" aria-label="开启新赛季"><h3>开启新赛季</h3>
-    <p>难度与名单是<b>两个独立维度</b>：<b>难度只决定对手的 BP 水平</b>（ban/选将有多强），<b>不改任何战力与属性</b>；名单决定 12 队怎么分人。</p>
+    <p>难度与名单是<b>两个独立维度</b>：<b>难度只决定对手的 BP 水平</b>（ban/选将有多强），<b>不改任何战力与属性</b>；名单决定 16 队怎么分人。</p>
     ${occupied ? `<div class="warn mb" style="border-color:rgba(255,59,48,.5)">⚠ 存档 ${ng.slot || 1} 已有进度（${escapeHtml(occupied.team)} · S${occupied.season} 第 ${occupied.round} 轮），<b>确认后将被覆盖</b>。</div>` : ""}
     <div class="muted mb">难度 / 对手 BP 水平（当前：<b style="color:var(--gold)">${ng.difficulty}</b>）：</div>
     <div class="hero-opt">${diffBtn("新秀")}${diffBtn("职业")}${diffBtn("传奇")}<button class="btn ghost sm" data-act="seldiffrand" aria-label="随机难度">🎲 随机</button></div>
     <div class="muted" style="font-size:12px;margin:6px 0 12px;line-height:1.6">${diffTip}</div>
     <div class="muted mb">名单模式（当前：<b style="color:var(--gold)">${ng.rosterMode === "real" ? "真实大名单" : "平衡选秀"}</b>）：</div>
     <div class="hero-opt mb">${rosterBtn("draft", "平衡选秀", "蛇形分配，各队战力接近")}${rosterBtn("real", "真实大名单", "按 2026 KPL 名单绑定，强队更强")}</div>
-    <div class="muted" style="font-size:12px;margin-bottom:10px">${ng.rosterMode === "real" ? "真实名单：12 队按 <b>2026 KPL 大名单</b>绑定首发/替补（强队更强、不平均分配）。<b>该名单下对手 BP 水平固定按「传奇」处理</b>（与所选难度无关）。" : "平衡选秀：按总评蛇形分配（每队一强一弱），各队开局战力接近；对手 BP 水平按上面的难度决定。"}</div>
+    <div class="muted" style="font-size:12px;margin-bottom:10px">${ng.rosterMode === "real" ? "真实名单：16 队按 <b>2026 KPL 大名单</b>绑定首发/替补（强队更强、不平均分配）。<b>该名单下对手 BP 水平固定按「传奇」处理</b>（与所选难度无关）。" : "平衡选秀：按总评蛇形分配（每队一强一弱），各队开局战力接近；对手 BP 水平按上面的难度决定。"}</div>
     <div class="muted mb">选择战队（当前：<b style="color:var(--gold)">${teamNow}</b>）：</div>
     <div class="hero-opt" style="max-height:150px;overflow:auto">
       <button class="btn ghost sm ${ng.teamName === "" ? 'gold' : ''}" data-act="selrandom" aria-label="随机战队">🎲 随机战队</button>
@@ -886,19 +886,20 @@ function advanceRegular() {
     save(); render(); return;
   }
   const sorted = standingsSorted();
-  const top4 = sorted.slice(0, 4);
-  const myRank = top4.findIndex(t => t.id === S.myTeamId);
+  const top10 = sorted.slice(0, 10);          // KPL 官方晋级线：常规赛前 10 进季后赛
+  const myRank = top10.findIndex(t => t.id === S.myTeamId);
   if (myRank === -1) {
     S.phase = "end"; S.seasonResult = { rank: sorted.findIndex(t => t.id === S.myTeamId) + 1, champion: false };
     addPrestige(-8, "无缘季后赛"); recordHistory();
-    S.event = { title: "赛季落幕", text: "常规赛结束。", msg: `很遗憾未能进入前四，最终排名第 ${S.seasonResult.rank}。` };
+    S.event = { title: "赛季落幕", text: "常规赛结束。", msg: `很遗憾未能进入前十，最终排名第 ${S.seasonResult.rank}。` };
     S.page = "event"; S.tab = "schedule"; save(); render(); return;
   }
-  setupPlayoff(top4.map(t => t.id));
+  setupPlayoff(top10.map(t => t.id));
   const next = playoffMyNext();
   S.pendingPlayoff = next;
   addPrestige(3, "晋级季后赛");
-  S.event = { title: "晋级季后赛（双败）！", text: "常规赛结束，杀入四强。", msg: `以第 ${myRank + 1} 名进入双败淘汰赛！首战：${next.label} vs ${teamName(next.oppId)}。` };
+  const zone = myRank < 4 ? "胜者组" : "败者组";
+  S.event = { title: "晋级季后赛（双败）！", text: `常规赛结束，以第 ${myRank + 1} 名进入${zone}。`, msg: `以第 ${myRank + 1} 名晋级双败淘汰赛（${zone}）！首战：${next.label} vs ${teamName(next.oppId)}。` };
   S.page = "event"; S.tab = "schedule"; save(); render();
 }
 
@@ -910,7 +911,7 @@ const SLOT_COUNT = 3;
 const LAST_SLOT_KEY = "kpl_coach_last_slot";
 /* 存档版本与迁移：每个函数只负责「从 v-1 升到 v」这一步，load() 里按顺序叠加执行。
    以后改数据结构时，加一个 SAVE_MIGRATIONS[n] 即可，不用再往 load() 里堆 if。 */
-const SAVE_VERSION = 10;
+const SAVE_VERSION = 11;
 const SAVE_MIGRATIONS = {
   10: s => {
     (s.teams || []).forEach(tm => POS.forEach(pos => (tm.players[pos] || []).forEach(p => {

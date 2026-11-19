@@ -7,7 +7,7 @@ module.exports = function (env, H) {
   suite("开档", () => {
     H.newGame(env, { difficulty: "职业", rosterMode: "draft" });
     ok("S 已建立", !!S());
-    ok("12 支战队", S().teams.length === 12, S().teams.length);
+    ok("16 支战队", S().teams.length === 16, S().teams.length);
     ok("每队五路首发", S().teams.every(t => T.POS.every(p => t.lineup[p])));
     ok("选手有年龄/合同", S().teams.every(t => T.POS.every(p => t.players[p].every(x => x.age >= 17 && x.contract >= 1))));
     ok("起点资金 ≥250（可能触发赞助事件）", T.getMyTeam().money >= 250, T.getMyTeam().money);
@@ -57,7 +57,7 @@ module.exports = function (env, H) {
     H.playSeries(env);
     ok("系列赛走完", !S().series, S().series && S().series.sub);
     ok("常规赛战绩有记录", T.getMyTeam().wins + T.getMyTeam().losses === 1, T.getMyTeam().wins + "/" + T.getMyTeam().losses);
-    ok("联盟其他场次也结算了", (S().fixtures[0] || []).filter(f => f.played).length === 6, (S().fixtures[0] || []).filter(f => f.played).length);
+    ok("联盟其他场次也结算了", (S().fixtures[0] || []).filter(f => f.played).length === 8, (S().fixtures[0] || []).filter(f => f.played).length);
   });
 
   suite("swing 参与判定", () => {
@@ -82,7 +82,7 @@ module.exports = function (env, H) {
     H.playSeries(env);
     const sorted = T.standingsSorted();
     ok("排序：积分降序", sorted.every((t, i) => i === 0 || sorted[i - 1].points >= t.points));
-    ok("小分统计含 12 队", Object.keys(T.teamGameStats()).length === 12);
+    ok("小分统计含 16 队", Object.keys(T.teamGameStats()).length === 16);
     S().tab = "standings";
     T.renderMain();
     ok("含晋级线", root().indexOf("晋级线") >= 0);

@@ -11,28 +11,26 @@ module.exports = function (env, H) {
     return S();
   }
 
-  suite("一键BP 禁用", () => {
+  suite("一键BP 全难度可用", () => {
     setup("传奇");
-    ok("传奇：禁用", T.autoBpAllowed() === false);
-    ok("传奇：myAutoPick 返回 null", T.myAutoPick() === null);
-    ok("传奇：myAutoBan 返回 null", T.myAutoBan() === null);
+    ok("传奇：允许一键BP", T.autoBpAllowed() === true);
+    ok("传奇：myAutoPick 能给出英雄", !!(T.myAutoPick() && T.myAutoPick().hero), T.myAutoPick() && T.myAutoPick().hero);
+    ok("传奇：myAutoBan 能给出 ban", !!T.myAutoBan());
     const d = S().series.draft, i0 = d.stepIndex;
-    let moved = false;
-    for (let i = 0; i < 6; i++) if (T.autoBpStep() !== false) { moved = true; break; }
-    ok("传奇：不推进 BP", !moved && d.stepIndex === i0, d.stepIndex);
-    T.autoBp();
-    ok("传奇：不进入运行态", !S()._autoRun);
+    let steps = 0;
+    for (let i = 0; i < 6; i++) if (T.autoBpStep() !== false) steps++;
+    ok("传奇：一键BP 能推进 BP", steps > 0 && d.stepIndex > i0, `${steps} 步`);
 
-    setup("新秀", "real");
+    setup("职业", "real");
     ok("真实名单：BP=传奇", T.aiBpLevel() === "传奇");
-    ok("真实名单：禁用一键BP", T.autoBpAllowed() === false);
+    ok("真实名单：允许一键BP", T.autoBpAllowed() === true);
 
-    ["新秀", "职业"].forEach(diff => {
+    ["新秀", "职业", "传奇"].forEach(diff => {
       setup(diff);
-      const d = S().series.draft;
-      let g = 0; while (d && !d.over && g++ < 60) T.autoBpStep();
-      ok(`${diff}：能走完 BP`, d.over === true);
-      ok(`${diff}：双方各 5 人`, d.picks[d.mySide].length === 5 && d.picks[T.aiSide(d)].length === 5);
+      const dd = S().series.draft;
+      let g = 0; while (dd && !dd.over && g++ < 80) T.autoBpStep();
+      ok(`${diff}：能走完 BP`, dd.over === true);
+      ok(`${diff}：双方各 5 人`, dd.picks[dd.mySide].length === 5 && dd.picks[T.aiSide(dd)].length === 5);
     });
   });
 

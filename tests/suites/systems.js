@@ -107,7 +107,7 @@ module.exports = function (env, H) {
     H.newGame(env, { difficulty: "职业" });
     ok("每队都有人格", S().teams.every(t => t.persona && T.personaOf(t)), "缺失");
     const kinds = new Set(S().teams.map(t => T.personaOf(t).key));
-    ok("12 队风格不全相同", kinds.size >= 3, kinds.size);
+    ok("16 队风格不全相同", kinds.size >= 3, kinds.size);
     // 人格只是"偏好"，权重必须在 0.9~1.15 之间，不能把对手钉死
     let inRange = true;
     T.PERSONAS.forEach(p => {
@@ -711,10 +711,10 @@ module.exports = function (env, H) {
       teamNames.filter(n => !T.REAL_ROSTERS[n]).join(","));
     ok("名单没有多余 key", Object.keys(T.REAL_ROSTERS).every(n => teamNames.indexOf(n) >= 0),
       Object.keys(T.REAL_ROSTERS).filter(n => teamNames.indexOf(n) < 0).join(","));
-    const lgd = S0.teams.find(t => t.name === "杭州LGD.NW");
+    const lgd = S0.teams.find(t => t.name === "杭州LGD.NBW");
     ok("LGD 走的是真实名单（有赤辰/小涵）",
       lgd && lgd.players.jungle.some(p => p.name === "赤辰") && lgd.players.bot.some(p => p.name === "小涵"));
-    const hero = S0.teams.find(t => t.name === "南京Hero久竞");
+    const hero = S0.teams.find(t => t.name === "南通Hero久竞");
     ok("Hero 走的是真实名单（有清弦/白清）",
       hero && hero.players.mid.some(p => p.name === "清弦") && hero.players.support.some(p => p.name === "白清"));
 
@@ -738,5 +738,50 @@ module.exports = function (env, H) {
     const shen = T.POOL.find(p => p.name === "神人");
     ok("神人已退役且归档对抗路", shen.retired === true && shen.pos === "top", `${shen.pos} ${shen.retired}`);
     ok("小白熊未退役", T.POOL.find(p => p.name === "小白熊").retired !== true);
+  });
+
+  /* 16 队 + 10 队双败（KPL 官方晋级线） */
+  suite("16队与10队双败", () => {
+    H.newGame(env, { difficulty: "职业" });
+    const S0 = T.getS();
+    ok("联盟 16 队", S0.teams.length === 16, S0.teams.length);
+    ok("常规赛 15 轮（单循环）", S0.schedule.length === 15, S0.schedule.length);
+    ok("每轮 8 场", (S0.fixtures[0] || []).length === 8, (S0.fixtures[0] || []).length);
+
+    // 直接摆一个季后赛：按积分榜前 10 开赛
+    const sorted = T.standingsSorted();
+    T.setupPlayoff(sorted.slice(0, 10).map(t => t.id));
+    const B = S0.bracket;
+    ok("bracket 有 12 场", B.def.length === 12, B.def.length);
+    ok("胜者组 3 场", B.def.filter(m => m.key.indexOf("ub") === 0).length === 3);
+    ok("败者组 8 场", B.def.filter(m => m.key.indexOf("lb") === 0).length === 8);
+
+    // 逐步推进：我方每场直接判胜，直到总决赛，验证引擎能走完
+    let guard = 0, myGames = 0;
+    while (guard++ < 40) {
+      const next = T.playoffMyNext();
+      if (!next || next.eliminated || next.champion) break;
+      B.resolved[next.slot] = { winner: S0.myTeamId, loser: next.oppId, sa: 4, sb: 2, games: [] };
+      myGames++;
+    }
+    ok("能一路推进到总决赛/出局", guard < 40, guard);
+    ok("我方至少打 2 场", myGames >= 2, myGames);
+    const gf = B.resolved.gf;
+    ok("最终能算出总冠军", !!gf, JSON.stringify(gf && gf.winner === S0.myTeamId));
+
+    // 双败：先输一场还能从败者组回来（模拟种子 1 输掉胜者组半决赛）
+    H.newGame(env, { difficulty: "职业" });
+    const S1 = T.getS();
+    const top10 = T.standingsSorted().slice(0, 10).map(t => t.id);
+    T.setupPlayoff(top10);
+    const mine = S1.myTeamId;
+    const first = T.playoffMyNext();
+    S1.bracket.resolved[first.slot] = { winner: first.oppId, loser: mine, sa: 1, sb: 4, games: [] };  // 先输
+    const second = T.playoffMyNext();
+    ok("胜者组输了会掉进败者组（还能再打）", !!second && !second.eliminated && second.slot.indexOf("lb") === 0,
+      second && second.slot);
+    S1.bracket.resolved[second.slot] = { winner: second.oppId, loser: mine, sa: 2, sb: 4, games: [] };
+    const third = T.playoffMyNext();
+    ok("败者组再输即淘汰", !!third && third.eliminated === true, JSON.stringify(third));
   });
 };

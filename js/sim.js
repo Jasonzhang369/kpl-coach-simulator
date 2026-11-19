@@ -124,39 +124,52 @@ function assignRosters(names) {
   POS.forEach(pos => leftover[pos] = []);
   const result = {};
   names.forEach(name => { result[name] = {}; POS.forEach(pos => result[name][pos] = []); });
+  const n = names.length;
 
   // 全局「档位」：同一支队在所有位置都靠前 / 都靠后，联盟才会出现真正的强弱差距。
-  // 旧版每个位置独立随机起点 → 大数定律把 12 队抹平成 1.2% 标准差，经营强弱毫无意义。
-  // 注意玩家是 names[0]，其名次 = (n - off) % n：off=1 时玩家恰好抽到垫底，
-  // 12% 战力差 + 自动 BP 会变成地狱开局，这里回避掉。
-  let baseOff = randInt(0, names.length - 1);
-  if (baseOff === 1) baseOff = 2;   // off=1 → 玩家第 12；改成 2 → 第 11，最差也不垫底
+  // 玩家是 names[0]，其名次 = (n - off) % n：off=1 时会垫底，这里回避掉。
+  let baseOff = randInt(0, n - 1);
+  if (baseOff === 1 && n > 4) baseOff = 2;
 
-  POS.forEach((pos, pi) => {
-    const need = names.length * 2;
+  POS.forEach(pos => {
     let list = byPos[pos].slice().sort((a, b) => b.ovr - a.ovr);
-    // 预留 2 名「中上水平」的选手不参加选秀，作为赛季初转会市场的自由身（否则市场只剩最弱的替补）
+    // 预留 4 名「中上水平」的选手不参加选秀，作为赛季初转会市场的自由身
+    // （16 队 × 2 人/位置几乎把池子分光，不预留的话市场会是空的）
     const reserve = list.filter(e => e.ovr >= 78 && e.ovr <= 87);
     const preLeft = [];
-    while (preLeft.length < 2 && reserve.length) preLeft.push(reserve.splice(randInt(0, reserve.length - 1), 1)[0]);
+    const reserveN = n >= 16 ? 4 : 2;
+    while (preLeft.length < reserveN && reserve.length) preLeft.push(reserve.splice(randInt(0, reserve.length - 1), 1)[0]);
     list = list.filter(e => !preLeft.includes(e));
-    const take = list.slice(0, need), rest = list.slice(need);
-    // 蛇形：0..n-1 拿排名 1..n，n-1..0 拿排名 n+1..2n → 各队两人名次之和几乎相同
+
+    // 首发：16 队各拿 1 人，按同一档位起点蛇形（每队一条「强弱序列」）
+    const starters = list.slice(0, n);
+    const rest = list.slice(n);
     const idxs = names.map((_, i) => i);
-    // 「首发取全队最强」意味着「拿到第 1 名的人就是该位置最强首发」。
-    // 起点以全局 baseOff 为主（±1 抖动，避免五个位置完全一致），于是强队各位置都靠前、
-    // 弱队各位置都靠后 —— 联盟才会自然分出层次（实测极差 ~12%，接近真实 KPL）。
-    const off = baseOff;   // 同一支队在所有位置都用同一个起点
+    const off = baseOff % n;
     const rot = idxs.slice(off).concat(idxs.slice(0, off));
-    const order = rot.concat(rot);   // 同向：队 i 拿第 i 与第 n+i 名 → 强队首发强、替补也强
-    order.forEach((teamIdx, i) => { const e = take[i]; if (e) result[names[teamIdx]][pos].push(makePlayerFrom(e)); });
-    rest.forEach(e => leftover[pos].push(e));
+    starters.forEach((e, i) => { const t = rot[i]; if (t != null && e) result[names[t]][pos].push(makePlayerFrom(e)); });
+
+    // 替补：选手池有限（16 队 × 2 人/位置会超过池子），所以按蛇形尽量补 1 个，
+    // 池子不够时就是「单替补」甚至「无替补」，由后续转会/青训补强。
+    const benchOrder = rot.concat(rot.slice().reverse());
+    const bench = rest.slice(0, n);
+    bench.forEach((e, i) => { const t = benchOrder[i]; if (t != null && e) result[names[t]][pos].push(makePlayerFrom(e)); });
+    rest.slice(n).forEach(e => leftover[pos].push(e));
     preLeft.forEach(e => leftover[pos].push(e));
   });
-  names.forEach(n => POS.forEach(pos => {
-    while (result[n][pos].length < 2) result[n][pos].push(makePlayerFrom(choice(activePool().filter(p => p.pos === pos))));
-    result[n][pos].sort((a, b) => b.ovr - a.ovr); // 首发用更强的
+
+  // 兜底：极端情况下（某位置池子少于队数）用任何未使用的同位置选手补齐首发
+  const used = new Set();
+  names.forEach(nm => POS.forEach(pos => result[nm][pos].forEach(p => used.add(p.name))));
+  names.forEach(nm => POS.forEach(pos => {
+    if (result[nm][pos].length) return;
+    const cand = leftover[pos].find(e => !used.has(e.name)) || activePool().find(p => p.pos === pos && !used.has(p.name));
+    if (!cand) return;
+    used.add(cand.name);
+    result[nm][pos].push(makePlayerFrom(cand));
+    leftover[pos] = leftover[pos].filter(e => e.name !== cand.name);
   }));
+  names.forEach(nm => POS.forEach(pos => result[nm][pos].sort((a, b) => b.ovr - a.ovr)));  // 首发用更强的
   POS.forEach(pos => shuffle(leftover[pos]));
   return { result, leftover };
 }
@@ -179,9 +192,9 @@ const BP_LEVELS = {
     searchDepth: 1, searchK: 6      // 会算你一步应手
   },
   传奇: {
-    name: "传奇", noise: 0.08, topN: 2, profW: 1.0, fitW: 1.0, counterW: 0.96,
-    compAware: true, banPoolN: 2, banRandom: 0.03, banUseThreat: true, peakTopN: 1,
-    searchDepth: 2, searchK: 8      // 算两步：我选 → 你应对 → 我再选
+    name: "传奇", noise: 0.04, topN: 2, profW: 1.0, fitW: 1.0, counterW: 1.0,
+    compAware: true, banPoolN: 2, banRandom: 0.02, banUseThreat: true, peakTopN: 1,
+    searchDepth: 2, searchK: 10     // 算两步：我选 → 你应对 → 我再选；候选更宽
   }
 };
 function aiBpLevel() {
@@ -310,6 +323,12 @@ function roundRobin(ids) {
   }
   return rounds;
 }
+/* 赛季长度归一化：场次越多（16 队 15 轮），单场收益越低，保证「一季总收入」与 12 队 11 轮时接近。
+   12 队 → 11 轮，系数 1.0；16 队 → 15 轮，系数 ≈0.73。 */
+function matchScale() {
+  const n = (S && S.teams && S.teams.length) ? S.teams.length : 12;
+  return clamp(11 / Math.max(6, n - 1), 0.62, 1.15);
+}
 // 战队比赛收益（AI 战队与玩家同规则：胜者拿资金/粉丝/声望）
 function addTeamPrestige(team, delta, reason) {
   if (!team) return;
@@ -323,8 +342,9 @@ function addTeamPrestige(team, delta, reason) {
 function awardTeamMatch(team, win, playoff) {
   if (!team) return null;
   const mul = playoff ? 1.8 : 1;
-  const money = Math.round((win ? randInt(20, 40) : randInt(6, 14)) * mul);
-  const fans = Math.round((win ? randInt(4000, 11000) : -randInt(800, 3500)) * (1 + team.prestige / 150));
+  const k = matchScale();
+  const money = Math.round((win ? randInt(20, 40) : randInt(6, 14)) * mul * k);
+  const fans = Math.round((win ? randInt(4000, 11000) : -randInt(800, 3500)) * (1 + team.prestige / 150) * Math.sqrt(k));
   team.money += money;
   team.fans = Math.max(1000, team.fans + fans);
   addTeamPrestige(team, win ? (playoff ? 3 : 1.5) : (playoff ? -2 : -1.2), playoff ? (win ? "季后赛胜利" : "季后赛失利") : (win ? "系列赛胜利" : "系列赛失利"));
@@ -333,17 +353,17 @@ function awardTeamMatch(team, win, playoff) {
 // 赛季结算：其他战队与玩家同规则（进季后赛 +3、无缘季后赛 -8、冠军 +15、亚军 +4）
 function finalizeAiPrestige() {
   if (!S || !S.teams) return;
-  // 没进季后赛（我未进四强）时没有 bracket，需要按常规赛积分榜取前四，否则会把四强也扣 -8
-  let top4 = (S.bracket && S.bracket.order) || [];
-  if (!top4.length) {
-    top4 = standingsSorted().slice(0, 4).map(t => t.id);
+  // 没进季后赛时没有 bracket，需要按常规赛积分榜取前 10，否则会把晋级队也扣 -8
+  let top10 = (S.bracket && S.bracket.order) || [];
+  if (!top10.length) {
+    top10 = standingsSorted().slice(0, 10).map(t => t.id);
   }
   const gf = S.bracket && S.bracket.resolved && S.bracket.resolved.gf;
   const champId = S.champion ? S.myTeamId : (gf ? gf.winner : null);
   const runnerId = gf ? gf.loser : null;
   S.teams.forEach(t => {
     if (t.id === S.myTeamId) return; // 玩家已按原有规则结算
-    let d = top4.includes(t.id) ? 3 : -8;
+    let d = top10.includes(t.id) ? 3 : -8;
     if (champId && t.id === champId) d = 15;
     else if (runnerId && t.id === runnerId) d = 4;
     addTeamPrestige(t, d, d > 0 ? (d >= 15 ? "总冠军" : d === 4 ? "亚军" : "晋级季后赛") : "无缘季后赛");
@@ -528,7 +548,7 @@ function applyRotation(auto) {
 }
 /* 板凳深度：每个位置「第二强」的选手同样贡献一部分战力（默认 15%）。
    1) 现实里轮换深度决定长赛季稳定性；
-   2) 让「双强主力 + 强替补」的队真的更强，联盟才有层次（否则首发取最强会把 12 队抹平）；
+   2) 让「双强主力 + 强替补」的队真的更强，联盟才有层次（否则首发取最强会把 16 队抹平）；
    3) 让转会/青训买替补不再只是"备胎"。 */
 const BENCH_WEIGHT = 0.15;
 function attrPowerOf(p) { return p.op * 0.30 + p.aw * 0.25 + p.co * 0.20 + p.me * 0.10 + p.st * 0.15; }
@@ -1254,8 +1274,8 @@ function commitGame(b) {
     const win = s.myScore > s.opScore;
     const phaseMul = s.kind === "playoff" ? 2 : 1;
     s.rewards = {
-      money: Math.round((win ? randInt(20, 40) : randInt(6, 14)) * phaseMul),   // 与 AI 同规则（awardTeamMatch）
-      fans: Math.round((win ? randInt(5000, 15000) : -randInt(1000, 6000)) * (1 + myT.prestige / 150)),
+      money: Math.round((win ? randInt(20, 40) : randInt(6, 14)) * phaseMul * matchScale()),   // 与 AI 同规则（awardTeamMatch）
+      fans: Math.round((win ? randInt(5000, 15000) : -randInt(1000, 6000)) * (1 + myT.prestige / 150) * Math.sqrt(matchScale())),
       win
     };
     settleLoanSeries();           // 大场之间结算租借（常规赛与季后赛一致），绝不在局中抽人
@@ -1443,7 +1463,88 @@ function tickStatuses() {
 
 
 /* ---------------- 双败淘汰 ---------------- */
-function setupPlayoff(top4) {
+/* ---------------- 季后赛：10 队双败（对齐 KPL 官方晋级线） ----------------
+   常规赛前 10 名晋级；前 4 进胜者组，5~10 从败者组打起。
+   结构（共 12 场 BO7）：
+     胜者组  ub1: 1v4   ub2: 2v3   ubf: 胜者组决赛
+     败者组  lb1: 7v10  lb2: 8v9   lb3: 5vW(lb2)  lb4: 6vW(lb1)
+             lb5: L(ub1)vW(lb3)   lb6: L(ub2)vW(lb4)   lb7: W(lb5)vW(lb6)
+             lbf: W(lb7)vL(ubf)
+     总决赛  gf: W(ubf) v W(lbf)
+   胜者组输一场掉进败者组，败者组再输即淘汰（5~10 名一开始就只有一条命）。 */
+const P10_DEF = [
+  { key: "ub1", a: { s: 0 }, b: { s: 3 }, stage: "胜者组半决赛①" },
+  { key: "ub2", a: { s: 1 }, b: { s: 2 }, stage: "胜者组半决赛②" },
+  { key: "lb1", a: { s: 6 }, b: { s: 9 }, stage: "败者组第一轮①" },
+  { key: "lb2", a: { s: 7 }, b: { s: 8 }, stage: "败者组第一轮②" },
+  { key: "ubf", a: { w: "ub1" }, b: { w: "ub2" }, stage: "胜者组决赛" },
+  { key: "lb3", a: { s: 4 }, b: { w: "lb2" }, stage: "败者组第二轮①" },
+  { key: "lb4", a: { s: 5 }, b: { w: "lb1" }, stage: "败者组第二轮②" },
+  { key: "lb5", a: { l: "ub1" }, b: { w: "lb3" }, stage: "败者组第三轮①" },
+  { key: "lb6", a: { l: "ub2" }, b: { w: "lb4" }, stage: "败者组第三轮②" },
+  { key: "lb7", a: { w: "lb5" }, b: { w: "lb6" }, stage: "败者组半决赛" },
+  { key: "lbf", a: { w: "lb7" }, b: { l: "ubf" }, stage: "败者组决赛" },
+  { key: "gf", a: { w: "ubf" }, b: { w: "lbf" }, stage: "总决赛" }
+];
+function bracketSide(tok, B) {
+  if (!tok) return null;
+  if (tok.s != null) return B.order[tok.s] || null;
+  if (tok.w) { const r = B.resolved[tok.w]; return r ? r.winner : null; }
+  if (tok.l) { const r = B.resolved[tok.l]; return r ? r.loser : null; }
+  return null;
+}
+function bracketRefresh() {
+  const B = S.bracket;
+  if (!B || !B.def) return;
+  B.def.forEach(m => {
+    const sl = B.slots[m.key] || (B.slots[m.key] = {});
+    sl.a = bracketSide(m.a, B); sl.b = bracketSide(m.b, B);
+  });
+}
+function bracketDef(key) { return (S.bracket.def || []).find(m => m.key === key) || null; }
+function resolveAIKey(key) {
+  const B = S.bracket, SL = B.slots[key], R = B.resolved;
+  if (!SL || !SL.a || !SL.b || R[key]) return;
+  const A = S.teams.find(t => t.id === SL.a), Bt = S.teams.find(t => t.id === SL.b);
+  if (!A || !Bt) return;
+  [A, Bt].forEach(tm => POS.forEach(pos => tm.players[pos].forEach(p => { p.st = clampSt(p, p.st + PLAYOFF_REST_GAIN); })));
+  const r = simAiSeries(A, Bt, 7);
+  const aWin = r.sa > r.sb;
+  R[key] = { winner: aWin ? SL.a : SL.b, loser: aWin ? SL.b : SL.a, sa: r.sa, sb: r.sb, games: r.games };
+  wearTeamStamina(A, r.games.length); wearTeamStamina(Bt, r.games.length);
+  awardTeamMatch(S.teams.find(t => t.id === R[key].winner), true, true);
+  awardTeamMatch(S.teams.find(t => t.id === R[key].loser), false, true);
+}
+/* 10 队双败：返回我下一场，或 { eliminated } / { champion } */
+function playoffMyNext10() {
+  const B = S.bracket, myId = S.myTeamId;
+  // 把我的比赛、以及与我无关的比赛都推进到「能算出来的最早一轮」
+  for (let guard = 0; guard < 40; guard++) {
+    bracketRefresh();
+    const mine = B.def.find(m => !B.resolved[m.key] && B.slots[m.key] && B.slots[m.key].a && B.slots[m.key].b
+      && (B.slots[m.key].a === myId || B.slots[m.key].b === myId));
+    if (mine) {
+      const sl = B.slots[mine.key];
+      return { slot: mine.key, oppId: sl.a === myId ? sl.b : sl.a, label: mine.stage };
+    }
+    const other = B.def.find(m => !B.resolved[m.key] && B.slots[m.key] && B.slots[m.key].a && B.slots[m.key].b);
+    if (!other) break;
+    resolveAIKey(other.key);
+  }
+  const losses = B.def.filter(m => B.resolved[m.key] && B.resolved[m.key].loser === myId).length;
+  const gf = B.resolved.gf;
+  if (gf && gf.winner === myId) return { champion: true, label: "总冠军" };
+  if (gf) return { eliminated: true, label: "总决赛失利" };
+  if (losses >= 2) return { eliminated: true, label: "双败出局" };
+  return { eliminated: true, label: "季后赛结束" };
+}
+function setupPlayoff(seeds) {
+  const order = (seeds || []).slice(0, 10);
+  S.bracket = { order, def: P10_DEF, slots: {}, resolved: {}, size: 10 };
+  S.phase = "playoff"; S.round = 1;
+  bracketRefresh();
+}
+function setupPlayoffLegacy(top4) {
   S.bracket = {
     order: top4,
     slots: {
@@ -1472,7 +1573,7 @@ function resolveAI(name) {
     awardTeamMatch(S.teams.find(t => t.id === l), false, true);
   }
 }
-function playoffMyNext() {
+function playoffMyNextLegacy() {
   const myId = S.myTeamId, B = S.bracket, R = B.resolved, SL = B.slots;
   const mine = (SL.usf1.a === myId || SL.usf1.b === myId) ? "usf1" : "usf2";
   const other = mine === "usf1" ? "usf2" : "usf1";
@@ -1510,6 +1611,11 @@ function playoffMyNext() {
     return { slot: "gf", oppId: R.ufin.winner, label: "总决赛" };
   }
 }
+function playoffMyNext() {
+  if (S.bracket && S.bracket.def) return playoffMyNext10();
+  return playoffMyNextLegacy();     // 兼容旧存档（4 队双败）
+}
+
 /* ---------------- 董事会目标（KPI） ----------------
    赛季初给 1 个主目标 + 1 个青年培养目标，赛季结束结算：达成给预算与声望，未达成扣预算。
    让中期有压力、有方向，而不是"只要不破产就一直打"。 */
@@ -1528,11 +1634,11 @@ function makeKpi() {
   else if (r.playoff) type = "playoff";
   else if ((t.prestige || 0) >= 55) type = "playoff";
   else if ((r.rank || 99) <= 6) type = "playoff";
-  const TITLE = { champion: "卫冕夺冠", final: "打进总决赛", playoff: "进入四强", top6: "常规赛前 6" };
+  const TITLE = { champion: "卫冕夺冠", final: "打进总决赛", playoff: "进入季后赛（前10）", top6: "常规赛前 6" };
   const DESC = {
     champion: "再次捧起总冠军奖杯",
     final: "至少打进总决赛（BO7）",
-    playoff: "常规赛杀进前 4，进入双败淘汰赛",
+    playoff: "常规赛杀进前 10，进入双败淘汰赛",
     top6: "常规赛排名前 6（不降级、不垫底）"
   };
   const k = KPI_REWARD[type];

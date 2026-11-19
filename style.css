@@ -305,10 +305,15 @@ kbd{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;backg
 .intel .intel-h{font-size:12px;font-weight:800;color:var(--red2);margin-bottom:6px}
 .ban-btn.threat{border-color:rgba(255,59,48,.45);color:#ffb3ab}
 
-/* ---------- 积分榜：晋级线 + 前4高亮 ---------- */
+/* ---------- 积分榜：晋级线 + 胜者组/季后赛区高亮 ---------- */
 .standings-wrap{overflow-x:auto}
-tr.top4 td{background:rgba(61,220,132,.05)}
+tr.top4 td{background:rgba(61,220,132,.07)}
 tr.top4 td:first-child{box-shadow:inset 3px 0 0 var(--green)}
+tr.top10 td{background:rgba(61,220,132,.03)}
+tr.cutline.soft td{
+  background:none;color:var(--txt2);font-size:11px;font-weight:700;letter-spacing:.5px;
+  text-align:center;padding:4px 10px;border-bottom:1px dashed var(--line)
+}
 tr.cutline td{
   background:repeating-linear-gradient(90deg,rgba(61,220,132,.16) 0 10px,transparent 10px 20px);
   color:var(--green);font-size:11.5px;font-weight:800;letter-spacing:.5px;

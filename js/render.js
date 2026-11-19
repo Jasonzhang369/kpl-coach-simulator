@@ -479,7 +479,7 @@ function renderSchedule() {
     ${renderHistory()}`;
   }
   const r = S.seasonResult || {};
-  const title = S.champion ? "🏆 冠军" : r.final ? "亚军" : r.playoff ? "四强" : `第 ${r.rank || "?"} 名`;
+  const title = S.champion ? "🏆 冠军" : r.final ? "亚军" : r.playoff ? "季后赛" : `第 ${r.rank || "?"} 名`;
   const myMatches = [];
   (S.fixtures || []).forEach((fx, i) => fx.forEach(f => {
     const mine = f.a === S.myTeamId || f.b === S.myTeamId;
@@ -548,7 +548,7 @@ function myMatchRows(fixturesArr) {
 function renderHistory() {
   if (!S.history.length) return `<div class="muted mt">这是你的第一个赛季。</div>`;
   const blocks = S.history.slice().reverse().map(h => {
-    const title = h.champion ? "🏆 冠军" : h.final ? "亚军" : h.rank ? `第 ${h.rank} 名` : (h.playoff ? "四强" : "未进季后赛");
+    const title = h.champion ? "🏆 冠军" : h.final ? "亚军" : h.rank ? `第 ${h.rank} 名` : (h.playoff ? "季后赛" : "未进季后赛");
     const wins = (h.matches || []).filter(m => m.win).length, loses = (h.matches || []).length - wins;
     const myTable = (h.matches && h.matches.length)
       ? `<table><thead><tr><th>轮次</th><th style="text-align:left">对手</th><th>比分</th><th>结果</th></tr></thead><tbody>${myMatchRows(h.matches)}</tbody></table>`
@@ -602,24 +602,25 @@ function renderStandings() {
   let rows = "";
   sorted.forEach((t, i) => {
     const s = stats[t.id] || { gw: 0, gl: 0, diff: 0 };
-    const cls = [t.id === S.myTeamId ? "you" : "", i < 4 ? "top4" : ""].filter(Boolean).join(" ");
+    const cls = [t.id === S.myTeamId ? "you" : "", i < 4 ? "top4" : i < 10 ? "top10" : ""].filter(Boolean).join(" ");
     rows += `<tr class="${cls}">
-      <td>${i < 4 ? '<b class="c-good">' + (i + 1) + "</b>" : i + 1}</td>
+      <td>${i < 10 ? '<b class="c-good">' + (i + 1) + "</b>" : i + 1}</td>
       <td style="text-align:left">${escapeHtml(t.name)}${t.id === S.myTeamId ? ' <span class="pill gold" style="font-size:10px">你</span>' : ""}</td>
       <td>${t.wins + t.losses}</td><td>${t.wins}</td><td>${t.losses}</td><td><b>${t.points}</b></td>
       <td class="${s.diff > 0 ? "c-good" : s.diff < 0 ? "c-bad" : "muted"}">${s.diff > 0 ? "+" : ""}${s.diff}</td>
       <td class="muted">${t.fans.toLocaleString()}</td><td class="muted">¥${t.money}万</td>
       <td style="color:${prestigeColor(t.prestige)}">${prestigeTier(t.prestige)}</td></tr>`;
-    if (i === 3) rows += `<tr class="cutline"><td colspan="10">✂ 季后赛晋级线 — 前 4 名进入双败淘汰赛</td></tr>`;
+    if (i === 3) rows += `<tr class="cutline soft"><td colspan="10">▲ 胜者组（前 4 名，季后赛先打胜者组，输一场还有败者组）</td></tr>`;
+    if (i === 9) rows += `<tr class="cutline"><td colspan="10">✂ 季后赛晋级线 — 前 10 名进入双败淘汰赛（5~10 名从败者组打起）</td></tr>`;
   });
   return `<div class="section-title">联盟积分榜 · S${S.season}</div>
   <div class="only-mobile muted" style="font-size:11.5px;margin:-4px 0 6px">← 左右滑动查看完整榜单 →</div>
   <div class="standings-wrap"><table><thead><tr><th>排名</th><th style="text-align:left">战队</th><th>场次</th><th>胜</th><th>负</th><th>积分</th><th>小分</th><th>粉丝</th><th>资金</th><th>声望</th></tr></thead><tbody>${rows}</tbody></table></div>
   <div class="legend mt">
-    <div><b class="c-good">前 4 名</b>（绿底）晋级季后赛（双败淘汰，BO7）。</div>
+    <div><b class="c-good">前 10 名</b>晋级季后赛（双败淘汰，BO7）；其中<b>前 4 名进胜者组</b>，<b>5~10 名从败者组</b>打起（输一场即淘汰）。</div>
     <div><b>小分</b> = 系列赛中<b>净胜局</b>（拿下的局数 − 丢掉的局数），用来衡量同为 X 积分时的强弱。</div>
     <div><b>排序规则</b>：① 积分（每场胜 +2）→ ② 小分（净胜局）→ ③ <b>相互战绩</b>（两队直接交手的胜负）→ ④ 总胜场 → ⑤ 总负场。</div>
-    <div class="muted">全部 12 队每轮各打一场（其他战队比赛自动结算），场次保持一致。其他战队与玩家<b>同规则</b>：通过比赛获取资金/粉丝/声望，并在<b>赛季初</b>买卖选手。</div>
+    <div class="muted">全部 16 队每轮各打一场（其他战队比赛自动结算），场次保持一致。其他战队与玩家<b>同规则</b>：通过比赛获取资金/粉丝/声望，并在<b>赛季初</b>买卖选手。</div>
   </div>`;
 }
 /* ---------- 双败 bracket 可视化 ---------- */
@@ -638,7 +639,7 @@ function bracketSlot(name) {
   const winN = escapeHtml(teamName(R.winner));
   return `<div class="bk-row done"><span class="bk-label">${label}</span><span>${aN} vs ${bN} → <b style="color:var(--green)">${winN}</b></span></div>`;
 }
-function renderBracket() {
+function renderBracketLegacy() {
   if (!S.bracket) return "";
   const order = S.bracket.order.map(id => teamName(id));
   return `<div class="section-title mt">双败淘汰赛程（前4：${order.map((n, i) => `${i + 1}.${escapeHtml(n)}`).join(" / ")}）</div>
@@ -650,6 +651,37 @@ function renderBracket() {
     ${bracketSlot("gf")}
   </div>
   <div class="muted mt">双败规则：胜者组半决赛 1v4、2v3；胜者组决赛胜者直通总决赛，负者坠入败者组决赛；败者组再负即淘汰。总决赛 BO7，胜者夺冠。BO7 打到 3:3 时第 7 局为<b style="color:var(--gold)">巅峰对决</b>（无 ban、盲选、不受全局BP限制）。点开每场可看比分与每局双方阵容。</div>`;
+}
+
+function renderBracket() {
+  if (!S.bracket) return "";
+  if (!S.bracket.def) return renderBracketLegacy();     // 旧存档（4 队）
+  bracketRefresh();
+  const B = S.bracket, myId = S.myTeamId;
+  const seeds = (B.order || []).map((id, i) => `${i + 1}.${escapeHtml(teamName(id))}`).join(" / ");
+  const line = key => {
+    const m = bracketDef(key), sl = B.slots[key] || {}, R = B.resolved[key];
+    if (!sl.a || !sl.b) return `<div class="bk-row"><span class="bk-label">${m.stage}</span><span class="muted">待定</span></div>`;
+    const aN = escapeHtml(teamName(sl.a)), bN = escapeHtml(teamName(sl.b));
+    const mine = sl.a === myId || sl.b === myId;
+    if (R && R.sa != null) {
+      return `<div class="bk-wrap${mine ? " mine" : ""}"><span class="bk-label">${m.stage}<i class="muted" style="font-size:10px"> BO7</i></span>
+        ${fixtureDetails({ a: sl.a, b: sl.b, sa: R.sa, sb: R.sb, played: true, games: R.games || [] })}</div>`;
+    }
+    if (R) return `<div class="bk-row done"><span class="bk-label">${m.stage}</span><span>${aN} vs ${bN} → <b style="color:var(--green)">${escapeHtml(teamName(R.winner))}</b></span></div>`;
+    return `<div class="bk-row${mine ? " mine" : ""}"><span class="bk-label">${m.stage}</span><span>${aN} vs ${bN}${mine ? ' <span class="pill gold" style="font-size:10px">你</span>' : ""}</span></div>`;
+  };
+  return `<div class="section-title mt">季后赛 · 10 队双败（常规赛前 10 晋级）</div>
+  <div class="muted mb" style="font-size:12px">种子：${seeds}</div>
+  <div class="bracket">
+    <div class="bk-sep">— 胜者组（1~4 名） —</div>
+    ${line("ub1")}${line("ub2")}${line("ubf")}
+    <div class="bk-sep">— 败者组（5~10 名 + 胜者组落败者） —</div>
+    ${line("lb1")}${line("lb2")}${line("lb3")}${line("lb4")}${line("lb5")}${line("lb6")}${line("lb7")}${line("lbf")}
+    <div class="bk-sep">— 总决赛 —</div>
+    ${line("gf")}
+  </div>
+  <div class="muted mt">双败规则：前 4 名进胜者组（输一场掉进败者组），5~10 名直接从败者组打起（输一场即淘汰）。胜者组冠军与败者组冠军打总决赛，BO7 打到 3:3 时第 7 局为<b style="color:var(--gold)">巅峰对决</b>（无 ban、盲选、不受全局BP限制）。点开每场可看比分与每局双方阵容。</div>`;
 }
 
 function renderMarket() {
@@ -731,8 +763,8 @@ function renderPrestige() {
 function renderFormat() {
   return `<div class="section-title">KPL 赛制表（S${S.season}）</div>
   <div class="report-line"><span class="tag key">联盟</span><span class="body">共 12 支战队，与其余 11 支进行一个赛季较量。</span></div>
-  <div class="report-line"><span class="tag win">常规赛</span><span class="body">单循环，每队 11 场，每场为 <b>BO5 系列赛</b>（先拿 3 分）。系列赛中<b>每一局都要 BP</b>，采用<b>全局 BP</b>：任意一方选过的英雄，后续局双方都不能再用。胜一场积 2 分，取<b>前 4 名</b>晋级季后赛。</span></div>
-  <div class="report-line"><span class="tag key">季后赛</span><span class="body"><b>双败淘汰</b>。胜者组半决赛 1v4、2v3（BO7）；胜者组决赛胜者直通总决赛、负者坠入败者组决赛；败者组半决赛（两个半决赛负者）再负即淘汰；败者组决赛胜者进总决赛。<b>总决赛 BO7</b>，胜者夺冠。</span></div>
+  <div class="report-line"><span class="tag win">常规赛</span><span class="body">单循环，每队 <b>15 场</b>，每场为 <b>BO5 系列赛</b>（先拿 3 分）。系列赛中<b>每一局都要 BP</b>，采用<b>全局 BP</b>：任意一方选过的英雄，后续局双方都不能再用。胜一场积 2 分，取<b>前 10 名</b>晋级季后赛（前 4 进胜者组，5~10 从败者组打起）。</span></div>
+  <div class="report-line"><span class="tag key">季后赛</span><span class="body"><b>常规赛前 10 名晋级，双败淘汰（BO7）</b>。前 4 名进<b>胜者组</b>（半决赛 1v4、2v3），5~10 名从<b>败者组</b>打起（7v10、8v9，输一场即淘汰）；胜者组落败的队掉进败者组，与败者组胜者逐轮对撞，最终胜者组冠军与败者组冠军打<b>总决赛</b>，胜者夺冠。</span></div>
   <div class="report-line"><span class="tag key">巅峰对决</span><span class="body">BO7 打到 <b>3:3</b> 时，第 7 局为<b>巅峰对决</b>：<b>没有 ban 位</b>、双方<b>盲选</b>、<b>不受全局BP限制</b>（此前用过的英雄仍可选），双方甚至可能<b>选到同一个英雄</b>。选满 5 人后立即揭示对手阵容并开赛。</span></div>
   <div class="report-line"><span class="tag key">季后赛赛果</span><span class="body">季后赛每场都会记录<b>比分与每局双方 BP 阵容</b>，在【赛程】页的双败赛程里点开即可查看；赛季结束后也会写进该赛季的赛季总结。</span></div>
   <div class="report-line"><span class="tag key">BP规则</span><span class="body">每局系统分配<b>蓝/红方</b>并逐局交替。官方四阶段征召，<b>每方共 5 个 ban</b>：①禁用 蓝→红→蓝→红；②选择 蓝→红 红→蓝 蓝→红；③禁用 红→蓝→红→蓝→红→蓝；④选择 红→蓝 蓝→红。<b>对手选将实时可见</b>，可后手 Counter；选将时可自选填充位置。</span></div>
@@ -741,7 +773,7 @@ function renderFormat() {
   <div class="report-line"><span class="tag key">OSCM</span><span class="body">英雄按 <b>输出(O)/生存(S)/控制(C)/机动(M)</b> 四维建模。BP 界面有双方阵容的 <b>OSCM 雷达图</b>（我方 vs 对手均值对比 + 逐项差值），并给每个已选英雄配迷你雷达；点选英雄时弹出该英雄雷达与对位克制提示，方便判断"差的是输出还是前排"。</span></div>
   <div class="report-line"><span class="tag key">一键BP</span><span class="body">BP 界面右上角 <b>⚡ 一键BP</b>：自动完成本局剩余全部 ban/选将（含 AI 回合），完成后直接进入战前战力计算。<b>强度介于「新秀」与「职业」之间</b>——会按分路/克制/选手擅长打分，但偶尔放过克制、偶尔随到次优英雄、ban 有时不盯对面绝活，<b>不适合当成稳赢工具</b>。<b>传奇难度（含真实大名单）直接禁用一键BP</b>，必须手动 ban/选。<b>不限使用次数</b>；执行时<b>逐步演示</b>（约 0.5 秒/步），运行中可点『停止自动BP』中止。</span></div>
   <div class="report-line"><span class="tag key">全局BP</span><span class="body">以<b>战队</b>为单位记录（<b>与红蓝方无关</b>，阵营每局互换不影响归属）：<b>本队用过的英雄后续局不能再选</b>；<b>对方战队用过的英雄，本队仍可抢选</b>（对方只锁它自己）。ban 位池只移除<b>对方战队</b>用过的英雄（本队用过的仍可 ban、只是不能选）。</span></div>
-  <div class="report-line"><span class="tag key">赛程</span><span class="body">全部 12 队每轮各打一场（其他战队比赛自动按战力结算），<b>场次保持一致</b>，积分榜实时更新。每轮的 <b>6 场对阵都会列出比分</b>，点开可看<b>每局双方 BP 阵容</b>；本赛季各轮对战可在赛程页折叠查看。</span></div>
+  <div class="report-line"><span class="tag key">赛程</span><span class="body">全部 16 队每轮各打一场（其他战队比赛自动按战力结算），<b>场次保持一致</b>，积分榜实时更新。每轮的 <b>8 场对阵都会列出比分</b>，点开可看<b>每局双方 BP 阵容</b>；本赛季各轮对战可在赛程页折叠查看。</span></div>
   <div class="report-line"><span class="tag key">赛季总结</span><span class="body">每个赛季结束会把<b>你与各队的全部战绩（对手/比分/胜负）</b>和联盟全部对战比分写入该赛季总结，<b>可折叠但永久保留</b>（赛程页底部与赛季结束页均可查看）。</span></div>
   <div class="report-line"><span class="tag key">战前</span><span class="body">选将完成后先出<b>战力计算</b>：双方战力对比、分路克制、<b>阵容合理性判定</b>（分路匹配/前排/输出/控制/战术契合），确认后点「开始比赛」。</span></div>
   <div class="report-line"><span class="tag key">败方选边</span><span class="body">系列赛中<b>上一局的败方</b>有权选择下一局的红/蓝方（蓝方先选、红方后手 Counter）。你落败时可自行选择阵营。</span></div>
@@ -749,7 +781,7 @@ function renderFormat() {
   <div class="report-line"><span class="tag key">转会</span><span class="body">每赛季 <b>${S.maxTransfers}</b> 次转会，<b>仅在赛季初转会窗口开放</b>（打第一场常规赛后关闭）。市场<b>每赛季初自动刷新一次、赛季内不可手动刷新</b>；<b>S 级选手极罕见</b>（约 1/4 的赛季才会出现 1 名）。<b>价格按身价</b>：总评 80 ≈ ¥266 万、90 ≈ ¥376 万，<b>卖出只回收 50%</b>。<b>其他 11 支战队与玩家完全同规则</b>：起点资金 250 万、声望 45、选手评分相近，通过比赛赚取资金/粉丝/声望，并在赛季初自动买卖选手——他们完成交易时会弹出通知，也可在【转会】页查看全部动态。</span></div>
   <div class="report-line"><span class="tag key">训练</span><span class="body">特训每次消耗 <b>1 训练点 + 资金</b>（按选手总评 5~11 万，越强越贵），单项 +1~2 且不超过上限。练满后可花 <b>${BREAK_PTS} 训练点 + 大量资金</b>（约 290~330 万）<b>突破上限</b> +1~2，继续成长（执行前二次确认）；<b>27 岁以上已过巅峰，不能突破上限</b>。<b>全队休息</b>：2 训练点 → 体能 +${restGain()}、心态 +4。每次特训/休息都可<b>撤销</b>。</span></div>
   <div class="report-line"><span class="tag key">教练组</span><span class="body">在【战队】页<b>聘用职员</b>（一次性聘用费 + 每赛季工资，赛季末结算，付不起会有人离职）：<b>🧠 心理咨询师</b> 每轮回心态（2 级起自动清低迷）· <b>🏋️ 体能教练</b> 每局体力消耗 -1/级、全队休息 +4/级 · <b>📊 数据分析师</b> 每轮训练点 +1/级、BP 对手情报 +2 个/级。每项 3 级。</span></div>
-  <div class="report-line"><span class="tag key">董事会目标</span><span class="body">每个赛季初董事会给 1 个<b>主目标</b>（卫冕夺冠 / 打进总决赛 / 进入四强 / 常规赛前 6，按上赛季成绩递进）+ 1 个<b>青年目标</b>（赛季末首发里有 ≤22 岁且总评 ≥80 的选手）。<b>达成</b>给预算与声望（最高 +260 万 / +8 声望），<b>未达成扣预算与声望</b>。目标卡片在【战队】页顶部，赛季末结算。</span></div>
+  <div class="report-line"><span class="tag key">董事会目标</span><span class="body">每个赛季初董事会给 1 个<b>主目标</b>（卫冕夺冠 / 打进总决赛 / 进入季后赛 / 常规赛前 6，按上赛季成绩递进）+ 1 个<b>青年目标</b>（赛季末首发里有 ≤22 岁且总评 ≥80 的选手）。<b>达成</b>给预算与声望（最高 +260 万 / +8 声望），<b>未达成扣预算与声望</b>。目标卡片在【战队】页顶部，赛季末结算。</span></div>
   <div class="report-line"><span class="tag key">英雄熟练</span><span class="body">每名选手有 6 个英雄的<b>熟练度 0~100</b>，直接乘进战力（绝活 ≈×1.11、可用 ≈×1.03、生疏 ≈×0.94）——所以"会用"比"版本强"更值钱。在【训练】页点 <b>🎯 英雄熟练</b> 可练某个英雄（1 训练点，+5~9），也可以花 2 训练点<b>学新英雄</b>（应对全局 BP 被 ban 光）。BP 选将台上的 <b>★数字</b> 就是熟练度。</span></div>
   <div class="report-line"><span class="tag key">对手风格</span><span class="body">每支 AI 战队有<b>战术人格</b>：四保一 / 野核 / 打架队 / 运营流 / 中野联动 / 全英雄池。人格只是把对应分路与定位的打分抬高 <b>3~8%</b>，<b>不是固定套路</b>——同一支队在不同局依然会选出不同阵容，只是整体更偏某种风格。赛程页与系列赛页会显示对手风格。</span></div>
   <div class="report-line"><span class="tag key">胜负判定</span><span class="body">一场比赛 = <b>赛前战力对比 → 赛前胜算 → 局内事件 → 结算</b>。<b>赛前胜算</b>由双方战力差决定（战力尺度 ${POWER_SCALE}：3% 战力差 ≈ 60% 胜率，不是一锤定音）。<b>局内事件会真正改变结果</b>：抢暴君、抢主宰、ACE、偷家、核心失误……都会累积成 <b>swing</b>，越到后期权重越高，最后一分钟用「赛前胜算 + 全部 swing」摇出胜负。<b>跳过战斗不会作弊</b>——它只是把剩余分钟快进跑完，概率分布与逐分钟观看完全一致。</span></div>
@@ -760,11 +792,11 @@ function renderFormat() {
   <div class="report-line"><span class="tag key">体能</span><span class="body">每局消耗 <b>${staminaCostPerGame()}</b> 体能（下限 ${STAMINA_FLOOR}，有体能教练会降低）；≤60 标「体能偏低」、≤45 标「体力告急」红标。恢复途径：<b>轮间自然 +${ROUND_STAMINA_GAIN}</b>（每轮开赛前）· <b>全队休息 +${restGain()}</b>（2 训练点，<b>只有大场打完后才能休息</b>，系列赛局间不可）· <b>季后赛每场开赛前 +${PLAYOFF_REST_GAIN}</b>（休整日，AI 同规则）· 赛季重置 +25。系列赛局间只能<b>换人</b>或<b>一键轮换</b>。</span></div>
   <div class="report-line"><span class="tag key">年龄合同</span><span class="body"><b>3 个赛季 = 1 岁</b>：第 4、7、10… 赛季开始时全联盟年龄 +1（顶栏显示「第 N 年」）。<b>26 岁以上开始衰退</b>，而且是<b>逐季</b>掉：<b>27~29 岁</b>每赛季操作/意识/配合/心态 <b>−1</b>、成长上限 −1；<b>30 岁起</b>每赛季 <b>−2</b>、上限 −2（练不回来）。≤26 岁仍有成长机会（21 岁以下最高，27 岁起不再成长）。<b>合同按赛季计（2~6 赛季）</b>，赛季末 −1；到期自动续约（身价 50%，主力或 A 级以上且资金足够），否则<b>离队进自由身池</b>；也可在【战队】页手动续约（3~6 赛季）。</span></div>
   <div class="report-line"><span class="tag key">赛季初租借</span><span class="body"><b>和转会买卖同一个窗口</b>：每赛季初开放、打第一场常规赛后关闭。窗口内可从其他战队<b>租借替补</b>：租费 = 身价 <b>25%</b>，<b>出场 ${LOAN_GAMES} 场</b>后自动返回原队（只算他真正上场的大场，一个小局上过即算 1 场，季后赛也算；坐板凳不计）。每赛季限 <b>${S.maxLoans || 1}</b> 次，入口在【转会】页。</span></div>
-  <div class="report-line"><span class="tag key">难度</span><span class="body"><b>难度 = 对手的 BP 水平</b>，<b>不改动任何战力/属性</b>：<b>新秀</b> 会犯小错——多数回合只按版本强度 ban（很少主动针对你的英雄池）、基本不读克制、偶尔拿舒适英雄，但仍会认分路、挑强度高的英雄；<b>职业</b> 会读克制、照顾自家选手擅长、补阵容前排与输出，ban 会瞄着你的核心；<b>传奇</b> 近乎最优，几乎总拿最强解，ban 基本必中你的第一核心。<b>名单模式</b>（平衡选秀 / 真实大名单）是另一个维度，只决定 12 队怎么分人；<b>真实大名单下对手 BP 固定按「传奇」</b>。</span></div>
+  <div class="report-line"><span class="tag key">难度</span><span class="body"><b>难度 = 对手的 BP 水平</b>，<b>不改动任何战力/属性</b>：<b>新秀</b> 会犯小错——多数回合只按版本强度 ban（很少主动针对你的英雄池）、基本不读克制、偶尔拿舒适英雄，但仍会认分路、挑强度高的英雄；<b>职业</b> 会读克制、照顾自家选手擅长、补阵容前排与输出，ban 会瞄着你的核心；<b>传奇</b> 近乎最优，几乎总拿最强解，ban 基本必中你的第一核心。<b>名单模式</b>（平衡选秀 / 真实大名单）是另一个维度，只决定 16 队怎么分人；<b>真实大名单下对手 BP 固定按「传奇」</b>。</span></div>
   <div class="report-line"><span class="tag key">音乐</span><span class="body">BGM 与音效都是 <b>Web Audio 实时合成</b>（仓库里没有音频文件）：主菜单一首、比赛一首、<b>巅峰对决（第 7 局）有专属曲</b>、夺冠还有一段短曲。顶栏 <b>⚙ 设置</b>可分别调背景音乐 / 音效 / 总音量的开关与大小（对所有存档生效）。想换成自己的巅峰对决 BGM：把音频命名为 <code style="background:var(--bg2);padding:1px 5px;border-radius:4px">audio/peak.mp3</code> 放进游戏目录即可，检测不到就回退内置曲。</span></div>
   <div class="report-line"><span class="tag key">界面</span><span class="body">顶栏右侧：💾 改存档名 · 📖 <b>游玩指南</b>（首次开档自动弹一次）· ⚙ 设置 · ? 快捷键 · 🏠 <b>返回首页</b>（自动存档；系列赛没打完会先确认）。</span></div>
   <div class="report-line"><span class="tag key">存档</span><span class="body"><b>3 个存档槽</b>，自动保存到当前槽位；每个槽可<b>改自定义名称</b>（标题界面「改名」，或游戏内右上角 💾），留空则显示战队名。标题界面可<b>导出 .json 备份</b>、<b>导入存档</b>（自动找空槽）、删除槽位。旧版单存档会自动迁移到存档 1。<b>危险操作</b>（覆盖开档、删除存档、卖出选手、突破上限、放弃系列赛）都会<b>二次确认</b>；特训/休息/签约等消耗型操作支持<b>↩ 撤销</b>（底部撤销条，仅主界面可撤销）。</span></div>
-  <div class="report-line"><span class="tag key">开档</span><span class="body">选手全部来自<b>真实 KPL/K甲 参赛选手</b>（2016-2026 各届大名单），评级与总评按其<b>历史战绩</b>综合评估（已计入 2025-2026 赛季结果）：S = 拿过总冠军/FMVP（一诺、Fly、小胖、清融、流浪、大帅、轩染、梓墨、花海、钟意、长生、听悦、暖阳、久诚、坦然、子阳等），A = 冠军队成员/总决赛常客，B = KPL 常规首发，C = 轮换替补/新秀。<b>平衡选秀</b>下开局不做任何属性加成或削弱，12 队靠<b>蛇形分配</b>拉平（每队一强一弱）；<b>真实名单</b>则按大名单原样绑定。后续各队靠训练、转会、比赛自行发展。</span></div>
+  <div class="report-line"><span class="tag key">开档</span><span class="body">选手全部来自<b>真实 KPL/K甲 参赛选手</b>（2016-2026 各届大名单），评级与总评按其<b>历史战绩</b>综合评估（已计入 2025-2026 赛季结果）：S = 拿过总冠军/FMVP（一诺、Fly、小胖、清融、流浪、大帅、轩染、梓墨、花海、钟意、长生、听悦、暖阳、久诚、坦然、子阳等），A = 冠军队成员/总决赛常客，B = KPL 常规首发，C = 轮换替补/新秀。<b>平衡选秀</b>下开局不做任何属性加成或削弱，16 队靠<b>蛇形分配</b>拉平（每队一强一弱）；<b>真实名单</b>则按大名单原样绑定。后续各队靠训练、转会、比赛自行发展。</span></div>
   <div class="report-line"><span class="tag key">操作</span><span class="body">键盘：<b>1~8</b> 切换页签 · <b>/</b> 搜索英雄 · <b>方向键 + Enter</b> 选/ban 英雄 · <b>B</b> 一键BP · <b>S</b> 跳过战斗 · <b>R</b> 一键轮换 · <b>Esc</b> 关闭弹窗 · <b>?</b> 帮助。所有按钮带 <b>aria-label</b>，属性条与选手卡有完整读屏描述；页面重渲染会<b>保留滚动位置与输入焦点</b>。</span></div>
   <div class="report-line"><span class="tag key">其他</span><span class="body">训练有<b>成长上限</b>（可花训练点+资金突破）；声望五档影响粉丝/转会/赞助；<b>一键BP 不限次数</b>；<b>BP 支持分路筛选/只看我的英雄池/对手擅长提示</b>；可打多个赛季建立王朝。</span></div>`;
 }
@@ -892,12 +924,12 @@ function renderPendingCard(name) {
    而不是无脑最优；evalPool 是参与精算的候选数，topN 是最终抽样的范围。
    下面 heuristic 分支（noise/profW/counterW/searchDepth）保留可切换，便于对比调参。 */
 const AUTO_BP = {
-  mode: "eval", evalPool: 16, topN: 4, jitter: 14, denyW: 0.45,
+  mode: "eval", evalPool: 16, topN: 4, jitter: 20, denyW: 0.45,
   noise: 0, searchDepth: 0, searchK: 8,
   profW: 1.00, fitW: 0.90, counterW: 0.95, compAware: true,   // 旧启发式分支的参数（保留可切换）
   banTop: 2, banTargetRate: 0.85
 };
-function autoBpAllowed() { return aiBpLevel() !== "传奇"; }
+function autoBpAllowed() { return true; }   // 任何难度（含传奇 / 真实大名单）都可以用一键 BP
 function myAutoBan() {
   if (!autoBpAllowed()) return null;
   const opp = S.teams.find(t => t.id === S.series.oppId);
@@ -1067,7 +1099,7 @@ function autoBpTick() {
   }, delay);
 }
 function autoBp() {
-  if (!autoBpAllowed()) { toast("传奇难度（含真实大名单）禁用一键 BP，请手动 ban / 选将"); return; }
+  if (!autoBpAllowed()) { toast("当前无法使用一键 BP"); return; }
   if (S._autoRun) { stopAutoBp("已停止自动 BP"); render(); return; }
   if (!S.series || S.series.sub !== "draft" || !S.series.draft) { toast("现在不是 BP 阶段"); return; }
   if (S.series.draft.over) { toast("本局 BP 已结束"); return; }
@@ -1292,11 +1324,8 @@ function renderSeries() {
         <button class="btn ghost sm ${d.tactic === '攻' ? 'gold' : ''}" data-act="drafttactic:攻" aria-pressed="${d.tactic === '攻'}" aria-label="本局战术：激进">激进</button>
         <button class="btn ghost sm ${d.tactic === '奇' ? 'gold' : ''}" data-act="drafttactic:奇" aria-pressed="${d.tactic === '奇'}" aria-label="本局战术：奇袭">奇袭</button>
       </div>
-      ${autoBpAllowed()
-        ? `<button class="btn ${autoBpRunning() ? 'ghost' : 'gold'} sm" data-act="autobp" aria-label="${autoBpRunning() ? "停止自动BP" : "一键BP，自动完成剩余禁用与选将"}" title="强度略低于手动（介于新秀与职业之间）：偶尔会放过克制或随到次优英雄。可再次点击停止，快捷键 B">${autoBpRunning() ? '⏹ 停止自动BP' : '⚡ 一键BP'}</button>`
-        : `<button class="btn ghost sm" disabled aria-label="传奇难度禁用一键BP，必须手动 ban 和选将" title="传奇难度（含真实大名单）禁用一键BP">🔒 一键BP（传奇禁用）</button>`}
+      <button class="btn ${autoBpRunning() ? 'ghost' : 'gold'} sm" data-act="autobp" aria-label="${autoBpRunning() ? "停止自动BP" : "一键BP，自动完成剩余禁用与选将"}" title="强度：对职业约五五开、对传奇约四六开（下风）。可再次点击停止，快捷键 B">${autoBpRunning() ? '⏹ 停止自动BP' : '⚡ 一键BP'}</button>
     </div>
-    ${!autoBpAllowed() ? `<div class="warn" style="border-color:rgba(255,59,59,.35);background:rgba(255,59,59,.07)">🔒 <b>传奇难度</b>（含真实大名单）下<b>禁用一键 BP</b>：请手动 ban / 选将。想用一键 BP 请切到新秀或职业难度开档。</div>` : ''}
     ${autoBpRunning() ? (peak
       ? `<div class="warn" style="border-color:rgba(245,197,24,.45);background:rgba(245,197,24,.08);color:var(--gold)">⚡ 正在自动盲选…（巅峰对决，选满 5 人即开赛）</div>`
       : `<div class="warn" style="border-color:rgba(245,197,24,.45);background:rgba(245,197,24,.08);color:var(--gold)">⚡ 自动 BP 进行中… 第 ${Math.min(d.stepIndex + 1, d.steps.length)} / ${d.steps.length} 步 · 我方 ${sideName(mySide)}（点『停止自动BP』可中止）</div>`) : ''}
