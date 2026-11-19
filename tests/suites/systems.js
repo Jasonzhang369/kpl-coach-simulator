@@ -720,5 +720,11 @@ module.exports = function (env, H) {
     ok("安凉英雄池含镜/露娜/哪吒", pl && ["镜", "露娜", "哪吒"].every(n => pl.heroPool.indexOf(n) >= 0),
       pl ? pl.heroPool.join("、") : "（未入队）");
     ok("镜是他的绝活", pl && pl.heroPool[0] === "镜", pl ? pl.heroPool[0] : "-");
+    ok("安凉池不出现嫦娥/裴擒虎/司空震", pl && ["嫦娥", "裴擒虎", "司空震"].every(n => pl.heroPool.indexOf(n) < 0), pl ? pl.heroPool.join("、") : "-");
+    const tao = T.POOL.find(p => p.name === "涛");
+    ok("涛 78（B）", tao.ovr === 78 && tao.rating === "B");
+    const shen = T.POOL.find(p => p.name === "神人");
+    ok("神人已退役且归档对抗路", shen.retired === true && shen.pos === "top", `${shen.pos} ${shen.retired}`);
+    ok("小白熊未退役", T.POOL.find(p => p.name === "小白熊").retired !== true);
   });
 };

@@ -47,7 +47,7 @@ function makePlayerFrom(e) {
   const age = clamp(e.ovr >= 90 ? randInt(20, 28) : e.ovr >= 84 ? randInt(19, 27) : randInt(17, 25), 17, 30);
   const stCap = stCapForAge(age);
   // 英雄池：6 个，第一个是绝活（熟练度最高），依次递减
-  let heroPool = pickHeroes(e.pos, 6);
+  let heroPool = pickHeroes(e.pos, 6, e.ex);
   // 招牌英雄（如安凉的镜/露娜/哪吒）：优先占绝活位，剩下的再随机补
   if (Array.isArray(e.sig) && e.sig.length) {
     const sig = e.sig.filter(n => HEROES.some(h => h.name === n));
@@ -66,10 +66,11 @@ function makePlayerFrom(e) {
     status: "ok", statusRounds: 0
   };
 }
-function pickHeroes(pos, n) {
+function pickHeroes(pos, n, exclude) {
   // 选手熟练池：主场英雄为主，掺入该选手也会用的高匹配摇摆英雄
-  const mainPool = HEROES.filter(h => h.pos === pos).map(h => h.name);
-  const flexPool = HEROES.filter(h => h.pos !== pos && laneFit(h, pos) >= 0.85).map(h => h.name);
+  const ex = exclude || [];
+  const mainPool = HEROES.filter(h => h.pos === pos && !ex.includes(h.name)).map(h => h.name);
+  const flexPool = HEROES.filter(h => h.pos !== pos && laneFit(h, pos) >= 0.85 && !ex.includes(h.name)).map(h => h.name);
   const pool = shuffle(mainPool.slice()).concat(shuffle(flexPool.slice()));
   const out = [];
   for (let i = 0; i < n && pool.length; i++) out.push(pool.splice(randInt(0, pool.length - 1), 1)[0]);

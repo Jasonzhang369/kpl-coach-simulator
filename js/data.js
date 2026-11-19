@@ -371,7 +371,7 @@ const POOL = [
   { name: "流星", pos: "top", rating: "A", ovr: 83 },  // EDG.M 边路
   { name: "轻语", pos: "top", rating: "A", ovr: 83 },  // 2026年总亚军JDG边路
   { name: "小泽", pos: "top", rating: "A", ovr: 83 },  // 2026夏冠军阵容
-  { name: "无痕", pos: "top", rating: "B", ovr: 80 },     // AG 早期主力边路
+  { name: "无痕", pos: "top", rating: "B", ovr: 80, retired: true },   // 2020 年因伤退役（AS仙阁初代冠军边路）
   { name: "樱花", pos: "top", rating: "A", ovr: 82 },  // 2026年总冠军阵容
   { name: "小困", pos: "top", rating: "B", ovr: 79 },
   { name: "冷轩", pos: "top", rating: "B", ovr: 79 },
@@ -401,7 +401,7 @@ const POOL = [
   { name: "皖皖", pos: "jungle", rating: "A", ovr: 86 },  // 2026夏亚打野
   { name: "佳心", pos: "jungle", rating: "A", ovr: 86 },  // 2026夏冠军打野轮换
   { name: "句号", pos: "jungle", rating: "A", ovr: 87 },  // 2026春冠军打野（猪八戒/大司命）
-  { name: "小白熊", pos: "jungle", rating: "A", ovr: 83, retired: true },   // 已退役
+  { name: "小白熊", pos: "jungle", rating: "A", ovr: 83 },   // 打野
   { name: "初晨", pos: "jungle", rating: "A", ovr: 83 },
   { name: "小楼", pos: "jungle", rating: "A", ovr: 82 },
   { name: "余忆", pos: "jungle", rating: "A", ovr: 82 },
@@ -410,18 +410,18 @@ const POOL = [
   { name: "赤辰", pos: "jungle", rating: "B", ovr: 80 },
   { name: "落尘", pos: "jungle", rating: "B", ovr: 80 },
   { name: "梦泪", pos: "jungle", rating: "B", ovr: 80, retired: true },   // 已退役
-  { name: "小兽", pos: "jungle", rating: "B", ovr: 79 },   // BA 黑凤梨
+  { name: "小兽", pos: "jungle", rating: "B", ovr: 79, retired: true },   // 2018 年退役（BA 自由人体系创始人）
   { name: "晨阳", pos: "jungle", rating: "B", ovr: 79 },
-  { name: "阿改", pos: "jungle", rating: "B", ovr: 79 },
+  { name: "阿改", pos: "jungle", rating: "B", ovr: 79, retired: true },   // 已转教练（无锡TCG 主教练）
   { name: "深巅", pos: "jungle", rating: "B", ovr: 78 },
-  { name: "神人", pos: "jungle", rating: "B", ovr: 77 },   // 佛山 GK 打野
+  { name: "神人", pos: "top", rating: "B", ovr: 77, retired: true },   // 已退役（原打野，现按对抗路归档）
   { name: "嘉宝", pos: "jungle", rating: "B", ovr: 77 },
-  { name: "安七", pos: "jungle", rating: "C", ovr: 74 },
+  { name: "安七", pos: "jungle", rating: "C", ovr: 74, retired: true },   // 2026-06 长沙TES.A 官宣退役
   { name: "书源", pos: "jungle", rating: "A", ovr: 83 },  // 2026夏最佳打野候选（长沙TES.A）
   { name: "米苏", pos: "jungle", rating: "B", ovr: 77 },  // 杭州LGD.NBW 打野
   { name: "航航", pos: "jungle", rating: "B", ovr: 76 },  // 上海RNG.M 打野
   { name: "小小阳", pos: "jungle", rating: "A", ovr: 82 },  // 佛山DRG 打野（2026夏首发）
-  { name: "安凉", pos: "jungle", rating: "A", ovr: 82, sig: ["镜", "露娜", "哪吒"] },   // 北京WB 野核打野（镜/露娜/哪吒）
+  { name: "安凉", pos: "jungle", rating: "A", ovr: 82, sig: ["镜", "露娜", "哪吒"], ex: ["嫦娥", "裴擒虎", "司空震"] },   // 北京WB 野核打野（镜/露娜/哪吒）
 
   // ===== 中路 =====
   { name: "清融", pos: "mid", rating: "S", ovr: 92 },  // 2026年总亚军JDG核心，十大年度记忆人物
@@ -439,7 +439,7 @@ const POOL = [
   { name: "暴风锐", pos: "mid", rating: "A", ovr: 82 },    // RNG.M
   { name: "Mojo", pos: "mid", rating: "A", ovr: 82 },      // QGhappy
   { name: "小名", pos: "mid", rating: "B", ovr: 81 },
-  { name: "见月", pos: "mid", rating: "B", ovr: 81 },
+  { name: "见月", pos: "mid", rating: "A", ovr: 81, retired: true },   // 2026-01 官宣退役（EDGM 中路）
   { name: "挽墨", pos: "mid", rating: "B", ovr: 80 },
   { name: "久寒", pos: "mid", rating: "B", ovr: 79 },
   { name: "小优", pos: "mid", rating: "B", ovr: 79 },
@@ -472,7 +472,7 @@ const POOL = [
   { name: "绝意", pos: "bot", rating: "A", ovr: 84 },  // 2026 主力射手
   { name: "凌云", pos: "bot", rating: "A", ovr: 83 },  // EDG.M 射手
   { name: "小麦", pos: "bot", rating: "B", ovr: 81 },
-  { name: "乔兮", pos: "bot", rating: "B", ovr: 81 },
+  { name: "乔兮", pos: "bot", rating: "A", ovr: 81, retired: true },   // 2026 夏转会后宣布休息，不再上大名单
   { name: "小雪", pos: "bot", rating: "A", ovr: 84 },  // 2026夏冠军射手
   { name: "小久", pos: "bot", rating: "B", ovr: 80 },
   { name: "小涵", pos: "bot", rating: "B", ovr: 79 },
@@ -485,7 +485,7 @@ const POOL = [
   { name: "零栩", pos: "bot", rating: "B", ovr: 77 },
   { name: "小玖", pos: "bot", rating: "B", ovr: 77 },      // 北京 JDG
   { name: "陌冷", pos: "bot", rating: "B", ovr: 77 },
-  { name: "虔诚", pos: "bot", rating: "B", ovr: 77 },      // RNG.M
+  { name: "虔诚", pos: "bot", rating: "B", ovr: 77, retired: true },   // KPL 十周年退役名单
   { name: "润润", pos: "bot", rating: "B", ovr: 76 },
   { name: "极光", pos: "bot", rating: "B", ovr: 76 },
   { name: "亮宇", pos: "bot", rating: "B", ovr: 76 },
@@ -513,7 +513,7 @@ const POOL = [
   { name: "玖欣", pos: "support", rating: "B", ovr: 81 },
   { name: "小崽", pos: "support", rating: "B", ovr: 81 },
   { name: "九幽", pos: "support", rating: "B", ovr: 80 },
-  { name: "笑影", pos: "support", rating: "B", ovr: 80 },
+  { name: "笑影", pos: "support", rating: "A", ovr: 80, retired: true },   // 2026-01 官宣退役（AG/EDG 游走）
   { name: "小A", pos: "support", rating: "B", ovr: 80 },
   { name: "信", pos: "support", rating: "B", ovr: 80 },     // 重庆狼队
   { name: "玖痕", pos: "support", rating: "B", ovr: 79 },
@@ -527,13 +527,13 @@ const POOL = [
   { name: "胖墩", pos: "support", rating: "B", ovr: 76 },   // 佛山 GK
   { name: "易瞳", pos: "support", rating: "B", ovr: 76 },
   { name: "Zero", pos: "support", rating: "B", ovr: 75 },   // RNG.M
-  { name: "涛", pos: "support", rating: "C", ovr: 74 },
+  { name: "涛", pos: "support", rating: "B", ovr: 78 },   // 北京WB 游走（2026 大名单）
   { name: "无铭", pos: "support", rating: "C", ovr: 73, retired: true },   // 已转教练
   { name: "涵", pos: "support", rating: "A", ovr: 84 },  // 2026夏冠军TTG游走，钟馗绝活
   { name: "月月", pos: "support", rating: "B", ovr: 76 },  // 2026夏冠军TTG游走替补
   { name: "白清", pos: "support", rating: "B", ovr: 80 },  // 南通Hero 游走
   { name: "小碎", pos: "support", rating: "B", ovr: 80 },  // 上海EDG.M 游走（2026首发）
-  { name: "冰尘", pos: "support", rating: "C", ovr: 73 },   // 杭州LGD.NBW 游走
+  { name: "冰尘", pos: "support", rating: "C", ovr: 73, retired: true },   // 2026-11 生日当天宣布退役（MTG/LGD）
 ];
 
 /* 现役池：退役选手仍保留在 POOL（选手表里能查到），但不进入选秀/自由身/转会市场 */
@@ -585,7 +585,7 @@ const REAL_ROSTERS = {
   },
   "杭州LGD.NBW": {
     top: ["小落", "花花"], jungle: ["米苏", "赤辰"],
-    mid: ["九尾", "小名"], bot: ["小久", "小涵"], support: ["小崽", "冰尘"]
+    mid: ["九尾", "小名"], bot: ["小久", "小涵"], support: ["小崽"]
   },
   "济南RW侠": {
     top: ["归期"], jungle: ["今屿"],
