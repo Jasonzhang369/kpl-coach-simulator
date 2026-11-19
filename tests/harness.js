@@ -69,6 +69,7 @@ globalThis.__T = {
   handleAct, startSeries, startMatch, newGameDraft, autoBpStep, autoBp, autoBpAllowed,
   battleTick, finishBattle, simGame, commitGame, seriesContinue, newSeason, advanceRegular,
   myAutoPick, myAutoBan, myPeakAutoPick, aiBanHero, aiPickTurn, aiBpLevel, aiBpCfg,
+  repairRosters, takeFreeAgent, recycleToFreeAgents, marketBuy, marketSell, loanFee,
   getMyTeam, teamPower, heroByName, heroStrength, laneFit, fitLabel, matchupMult,
   HEROES, HERO_TRAITS, heroTraitMult, heroTraitNote, ANTI_CC_THRESHOLD, pickHeroes,
   HERO_FORMS, heroInPos, heroFormOf, heroHasForms, heroFormLabel, heroFormList, heroFormForPos, pickEntry, posPower, evaluateComp,
@@ -89,9 +90,12 @@ globalThis.__T = {
   audioPref, saveAudioPref, audioSupported, sfx, playBgm, stopBgm, updateBgm, unlockAudio,
   TRACKS, AUDIO_DEFAULTS, AUDIO_PREF_KEY, guideSeen, markGuideSeen, openSettings, openGuide, goTitle, bgmTrackFor,
   isTouchDevice,
+  // 二次确认弹窗在无头环境里永远不会 resolve，这里给测试一个可替换的钩子
+  _origConfirm: confirmDialog, _origNameDialog: nameDialog,
+  setConfirm: fn => { confirmDialog = fn || globalThis.__T._origConfirm; },
+  setNameDialog: fn => { nameDialog = fn || globalThis.__T._origNameDialog; },
   autoBpStepSafe: 0
-};
-`;
+};`;
   const ctx = {
     console, setTimeout: () => 0, clearTimeout() {}, setInterval: () => 0, clearInterval() {},
     Math, Date, JSON, Number, String, Object, Array, RegExp, Error, parseInt, parseFloat, isNaN,

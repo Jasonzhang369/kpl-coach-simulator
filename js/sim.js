@@ -115,6 +115,36 @@ function recycleToFreeAgents(p) {
   if (!S.freeAgents[p.pos]) S.freeAgents[p.pos] = [];
   S.freeAgents[p.pos].push({ name: p.name, pos: p.pos, rating: p.rating, ovr: p.ovr });
 }
+/* 阵容自愈：修「同一名选手出现在两支战队」与「自由身池里还留着队内选手」。
+   起因是早期买自由身选手时没从池里删除，之后 AI 又从池里抽到同一个人。
+   旧存档可能带着脏数据，读档 / 换赛季时统一修一遍：同名者按首次出现保留，其余移除并补人。 */
+function repairRosters() {
+  if (!S || !S.teams || !S.freeAgents) return 0;
+  const owner = new Map();
+  let fixed = 0;
+  S.teams.forEach(t => POS.forEach(pos => {
+    if (!t.players[pos]) t.players[pos] = [];
+    const list = t.players[pos];
+    for (let i = list.length - 1; i >= 0; i--) {
+      const pl = list[i], key = pl && pl.name;
+      if (!key) { list.splice(i, 1); fixed++; continue; }
+      if (owner.has(key)) { list.splice(i, 1); fixed++; }
+      else owner.set(key, t.id);
+    }
+  }));
+  POS.forEach(pos => {
+    const list = S.freeAgents[pos] || [];
+    const kept = list.filter(e => { if (e && owner.has(e.name)) { fixed++; return false; } return true; });
+    S.freeAgents[pos] = kept;
+  });
+  if (fixed) {
+    S.teams.forEach(t => {
+      POS.forEach(pos => { if (!t.players[pos].length) t.players[pos].push(takeFreeAgent(pos)); });
+      initLineup(t);
+    });
+  }
+  return fixed;
+}
 // 分配初始名单：全部使用真实选手，按总评从高到低【蛇形选秀】——
 // 每队拿到「一强一弱」两人，各队战力天然接近（靠分配平衡，绝不修改任何选手的评分/属性）。
 function assignRosters(names) {
@@ -1011,7 +1041,8 @@ function afterDraftAction() {
   save(); render();
 }
 function draftBan(hn) {
-  const s = S.series, d = s.draft;
+  const s = S.series, d = s && s.draft;
+  if (!d) return;
   const st = currentStep();
   if (!st || st.actor !== d.mySide || st.type !== "ban") return;
   if (d.used.includes(hn) || oppUsed().includes(hn)) return; // 本队用过的仍可ban；对方战队用过的已从ban池移除
@@ -1079,7 +1110,7 @@ function finishDraft() {
 }
 /* 选将：只记英雄（+形态），不决定分路；双方选满 5 个后统一排位 */
 function draftPick(hn, form) {
-  const s = S.series, d = s.draft;
+  const s = S.series, d = s && s.draft;
   if (!d || d.over || d.phase === "assign") return;
   const my = d.picks[d.mySide] || [];
   if (my.length >= 5) return;
@@ -1728,6 +1759,7 @@ function newSeason() {
   recordHistory();
   S.season++;
   returnAllLoans();   // 先把租借球员退回原队
+  repairRosters();    // 清理历史脏数据（同名选手跨队 / 自由身池残留）
   // 先发赛季奖金再谈合同：否则刚打完季后赛却因为账上没钱而放走主力
   const bonus = S.champion ? 90 : (r.playoff || r.final ? 55 : 28);
   t.money += bonus;
@@ -1943,7 +1975,12 @@ function marketBuy(id) {
   if (t.money < c.price) { toast("资金不足！"); return; }
   if (t.players[c.pos].length >= 4) { toast(`${POS_NAME[c.pos]} 人数已满`); return; }
   snapshot(`签下 ${c.name}`);
-  if (c.kind === "fa") t.players[c.pos].push(c.player);
+  if (c.kind === "fa") {
+    // 自由身池里要同步删掉这个人，否则下个赛季 AI 会从池里再抽到同一个人 → 两队出现同名选手
+    const pool = S.freeAgents && S.freeAgents[c.pos];
+    if (pool) { const i = pool.findIndex(e => e && e.name === c.name); if (i >= 0) pool.splice(i, 1); }
+    t.players[c.pos].push(c.player);
+  }
   else {
     const src = S.teams.find(x => x.id === c.teamId);
     const idx = src.players[c.pos].findIndex(p => p.id === c.playerId);

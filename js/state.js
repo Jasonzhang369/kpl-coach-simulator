@@ -448,10 +448,10 @@ function handleAct(act) {
     }, 750);
     return;
   }
-  if (cmd === "drafttactic") { S.series.draft.tactic = args[0]; render(); return; }
+  if (cmd === "drafttactic") { if (!S.series || !S.series.draft) return; S.series.draft.tactic = args[0]; render(); return; }
   if (cmd === "autobp") { autoBp(); return; }
   if (cmd === "bplane") { bpFilter().lane = args[0]; render(); return; }
-  if (cmd === "seriesnext") { S.series.sub = "sub"; save(); render(); return; }
+  if (cmd === "seriesnext") { if (!S.series) return; S.series.sub = "sub"; save(); render(); return; }
   if (cmd === "seriesstartgame") { newGameDraft(); return; }
   if (cmd === "seriescontinue") { seriesContinue(); return; }
   if (cmd === "abandonseries") {
@@ -461,7 +461,17 @@ function handleAct(act) {
       okText: "放弃并返回", danger: true
     }).then(ok => {
       if (!ok) return;
-      stopAutoBp(); S.series = null; S.page = "main"; save(); render();
+      stopAutoBp();
+      const s = S.series;
+      if (!s) { S.page = "main"; render(); return; }
+      // 按「0 : 晋级所需局数」判负结算，走正常战报流程：
+      // 这样战绩/声望/积分/本轮对手比赛都会照常推进，不会出现"放弃没代价、还能重打同一场"的白嫖漏洞。
+      s.myScore = 0; s.opScore = Math.ceil(s.bestOf / 2);
+      s.games = s.games || [];
+      s.rewards = { money: 0, fans: -randInt(2000, 5000), win: false };
+      s.sub = "over";
+      S.log.unshift(`S${S.season} 放弃系列赛：vs ${teamName(s.oppId)}（判负 0:${s.opScore}）`);
+      seriesContinue();
     });
     return;
   }
@@ -780,7 +790,10 @@ function newGameDraft() {
 }
 function seriesContinue() {
   stopAutoBp();
-  const s = S.series, t = getMyTeam(), win = s.myScore > s.opScore;
+  const s = S.series;
+  if (!s) return;                    // 已经结算过（重复点击/放弃后残留按钮）
+  if (s.sub !== "over") return;      // 系列赛没打完不允许结算
+  const t = getMyTeam(), win = s.myScore > s.opScore;
   try { sfx(win ? "win" : "lose"); } catch (e) {}
   // 对手（AI 战队）跟玩家打完同样消耗体能：否则它们每轮只 +8 恢复、从不支出，
   // 11 轮后满体力 99，而玩家一路掉到 35 下限 —— 相当于玩家凭空少 10% 战力。
@@ -1175,6 +1188,8 @@ function load(n) {
       if (S.series.gameIndex == null) S.series.gameIndex = (S.series.games || []).length;
     }
     S.page = normalizeSavePage(S);
+    // 读档自愈：旧存档可能带着「同一选手在两队 / 自由身池残留」的脏数据
+    try { repairRosters(); } catch (e) {}
   } catch (e) {
     return loadFailed(slot, "存档数据升级失败：" + (e && e.message ? e.message : String(e)), raw);
   }

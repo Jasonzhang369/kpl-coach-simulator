@@ -796,4 +796,59 @@ module.exports = function (env, H) {
     const third = T.playoffMyNext();
     ok("败者组再输即淘汰", !!third && third.eliminated === true, JSON.stringify(third));
   });
+
+  /* 本轮检修新增：转会池一致性 / 放弃系列赛的真实结算 / 脏存档自愈 */
+  suite("转会池一致 · 放弃判负 · 脏数据自愈", () => {
+    const e2 = H.makeEnv();
+    const T2 = e2.T;
+    T2.setConfirm(() => ({ then: f => f(true) }));
+    T2.newGame({ difficulty: "职业", rosterMode: "draft", teamName: "成都AG超玩会", slot: 1 });
+    const t = T2.getMyTeam();
+    const S0 = T2.getS();
+
+    // 1) 买自由身选手：必须从自由身池里删掉，否则下赛季 AI 会抽到同一个人（两队同名）
+    const cand = (S0.market || []).find(c => c.kind === "fa" && t.players[c.pos].length < 4 && t.money >= c.price);
+    ok("市场里有可买的自由身", !!cand);
+    if (cand) {
+      ok("买前自由身池里有他", (S0.freeAgents[cand.pos] || []).some(e => e.name === cand.name));
+      T2.handleAct("marketbuy:" + cand.id);
+      const S1 = T2.getS();
+      ok("买下后进入本队名单", t.players[cand.pos].some(p => p.name === cand.name));
+      ok("买下后自由身池不再有他", !(S1.freeAgents[cand.pos] || []).some(e => e.name === cand.name));
+      ok("买下后市场里也移除了", !(S1.market || []).some(c => c.id === cand.id));
+    }
+
+    // 2) 放弃系列赛必须按判负结算（否则等于可以无代价重打同一场）
+    T2.startMatch();
+    ok("系列赛已开始", !!T2.getS().series);
+    const round0 = T2.getS().round, loss0 = t.losses;
+    T2.handleAct("abandonseries");
+    const S2 = T2.getS();
+    ok("放弃后系列赛清空", !S2.series);
+    ok("放弃按判负记 1 负", t.losses === loss0 + 1, `${loss0}→${t.losses}`);
+    ok("放弃后轮次前进", S2.round === round0 + 1, `${round0}→${S2.round}`);
+    ok("放弃后该轮标记已打", (S2.schedule || []).filter(x => !x.played).length === 14,
+      (S2.schedule || []).filter(x => !x.played).length);
+    ok("放弃后可以继续打下一轮", (() => { T2.startMatch(); const okk = !!T2.getS().series; return okk; })());
+
+    // 3) 脏数据自愈：同名选手跨队 + 自由身池残留
+    const S3 = T2.getS();
+    const a = S3.teams.find(x => x.id !== S3.myTeamId);
+    const b = S3.teams.find(x => x.id !== S3.myTeamId && x.id !== a.id);
+    const clone = JSON.parse(JSON.stringify(a.players.top[0]));
+    clone.id = "dupX";
+    b.players.top.push(clone);
+    if (!S3.freeAgents.top) S3.freeAgents.top = [];
+    S3.freeAgents.top.push({ name: clone.name, pos: "top", rating: clone.rating, ovr: clone.ovr });
+    const fixed = T2.repairRosters();
+    ok("自愈至少修掉 2 处脏数据", fixed >= 2, fixed);
+    const seen = new Set();
+    let dup = 0, faClash = 0;
+    S3.teams.forEach(tm => ["top", "jungle", "mid", "bot", "support"].forEach(p => (tm.players[p] || []).forEach(x => {
+      if (seen.has(x.name)) dup++; else seen.add(x.name);
+    })));
+    (S3.freeAgents.top || []).forEach(e => { if (seen.has(e.name)) faClash++; });
+    ok("自愈后全联盟无同名选手", dup === 0, dup);
+    ok("自愈后自由身池无队内选手", faClash === 0, faClash);
+  });
 };
