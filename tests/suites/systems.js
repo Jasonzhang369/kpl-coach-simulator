@@ -717,6 +717,18 @@ module.exports = function (env, H) {
     const hero = S0.teams.find(t => t.name === "南通Hero久竞");
     ok("Hero 走的是真实名单（有清弦/白清）",
       hero && hero.players.mid.some(p => p.name === "清弦") && hero.players.support.some(p => p.name === "白清"));
+    // 关键回归：名单里写的名字必须是池内真实存在的选手，否则 buildRealRosters 会静默跳过 → 走"最强未归属"兜底
+    const POS5 = ["top", "jungle", "mid", "bot", "support"];
+    const missing = [];
+    Object.keys(T.REAL_ROSTERS).forEach(tn => POS5.forEach(p =>
+      (T.REAL_ROSTERS[tn][p] || []).forEach(nm => { if (!T.POOL.some(x => x.name === nm)) missing.push(tn + "." + nm); })));
+    ok("名单里的选手都在池中", missing.length === 0, missing.join(","));
+    // 2026 赛季 DYG 实测首发（春/夏 BP 记录）：小乐 / 小轩 / 向鱼 / 钎城 / 落空
+    const dyg = S0.teams.find(t => t.name === "深圳DYG");
+    const dygStart = dyg ? POS5.map(p => { const x = dyg.players[p].find(y => y.id === dyg.lineup[p]); return x ? x.name : ""; }) : [];
+    ok("DYG 首发为小乐/小轩/向鱼/钎城/落空", dygStart.join("/") === "小乐/小轩/向鱼/钎城/落空", dygStart.join("/"));
+    const starterOf = nm => S0.teams.filter(t => POS5.some(p => t.players[p].some(x => x.name === nm)));
+    ok("小白熊已是自由身（不在任何战队）", starterOf("小白熊").length === 0);
 
     // 数据侧：安凉的招牌英雄与几处评分调整
     const al = T.POOL.find(p => p.name === "安凉");

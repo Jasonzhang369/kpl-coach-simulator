@@ -385,7 +385,8 @@ const POOL = [
   { name: "无幻", pos: "top", rating: "B", ovr: 76 , team: "长沙TES.A" },
   { name: "䲷龙", pos: "top", rating: "C", ovr: 74 },
   { name: "景晚", pos: "top", rating: "B", ovr: 77 , team: "XYG" },     // 南京Hero久竞 2025春首发
-  { name: "栋栋", pos: "top", rating: "B", ovr: 75 , team: "深圳DYG" },     // 南京Hero久竞
+  { name: "栋栋", pos: "top", rating: "B", ovr: 75 , team: "深圳DYG" },     // 2025-11 加入 DYG，对抗路轮换
+  { name: "小乐", pos: "top", rating: "B", ovr: 80 , team: "深圳DYG" },     // DYG 2026 主力对抗路（春/夏双赛季首发）
   { name: "恒心", pos: "top", rating: "C", ovr: 73 },
   { name: "风行", pos: "top", rating: "C", ovr: 72 },
   { name: "光明", pos: "top", rating: "A", ovr: 85 , team: "北京JDG" },   // 2026夏最佳对抗路候选；2026年总亚军JDG首发边路
@@ -402,7 +403,9 @@ const POOL = [
   { name: "皖皖", pos: "jungle", rating: "A", ovr: 86 , team: "重庆狼队" },  // 2026夏亚打野
   { name: "佳心", pos: "jungle", rating: "A", ovr: 86 , team: "广州TTG" },  // 2026夏冠军打野轮换
   { name: "句号", pos: "jungle", rating: "A", ovr: 87 , team: "苏州KSG" },  // 2026春冠军打野（猪八戒/大司命）
-  { name: "小白熊", pos: "jungle", rating: "A", ovr: 83 },   // 打野
+  { name: "小白熊", pos: "jungle", rating: "A", ovr: 83 },   // 2026-01 与杭州LGD.NBW 解约，自由身（未退役）
+  { name: "小轩", pos: "jungle", rating: "B", ovr: 80 , team: "深圳DYG" },   // DYG 2026 主力打野（杨戬/云缨/阿古朵）
+  { name: "方羽", pos: "jungle", rating: "C", ovr: 75 , team: "深圳DYG" },   // 2026-05 新秀签约 DYG，打野轮换
   { name: "初晨", pos: "jungle", rating: "A", ovr: 83 },
   { name: "小楼", pos: "jungle", rating: "A", ovr: 82 , team: "武汉eStarPro" },
   { name: "余忆", pos: "jungle", rating: "A", ovr: 82 , team: "武汉eStarPro" },
@@ -455,7 +458,8 @@ const POOL = [
   { name: "小晗", pos: "mid", rating: "C", ovr: 74 , team: "WST" },     // 济南RW侠
   { name: "许诺", pos: "mid", rating: "C", ovr: 74, retired: true },   // 已退役
   { name: "老帅", pos: "mid", rating: "C", ovr: 74, retired: true },   // 已退役
-    { name: "向鱼", pos: "mid", rating: "B", ovr: 78 , team: "深圳DYG" },  // 中路老将
+    { name: "向鱼", pos: "mid", rating: "B", ovr: 78 , team: "深圳DYG" },  // DYG 2025-11 加盟，中路老将
+  { name: "星潼", pos: "mid", rating: "C", ovr: 76 , team: "深圳DYG" },  // DYG 2025-12 加盟，中路轮换
   { name: "柚子", pos: "mid", rating: "A", ovr: 82 , team: "佛山DRG" },  // 佛山DRG 中路（2026夏首发）
   { name: "清弦", pos: "mid", rating: "B", ovr: 79 , team: "南通Hero久竞" },  // 南通Hero 中路（2026夏引进）
   { name: "玖熙", pos: "mid", rating: "B", ovr: 78 , team: "南通Hero久竞" },  // 南通Hero 中路
@@ -468,7 +472,7 @@ const POOL = [
   { name: "梦岚", pos: "bot", rating: "A", ovr: 86 , team: "佛山DRG" },
   { name: "道崽", pos: "bot", rating: "A", ovr: 87 , team: "重庆狼队" },  // 2026夏亚核心，多次单局MVP
   { name: "易峥", pos: "bot", rating: "A", ovr: 86, retired: true },   // 已退役
-  { name: "小义", pos: "bot", rating: "A", ovr: 85 },      // DYG，2020秋 FMVP
+  { name: "小义", pos: "bot", rating: "A", ovr: 85 },      // 2020秋 FMVP，2026 出场稀少，自由身
   { name: "小俞", pos: "bot", rating: "A", ovr: 83 , team: "济南RW侠" },
   { name: "绝意", pos: "bot", rating: "A", ovr: 84 , team: "西安WE" },  // 2026 主力射手
   { name: "凌云", pos: "bot", rating: "A", ovr: 83 , team: "上海EDG.M" },  // EDG.M 射手
@@ -517,8 +521,9 @@ const POOL = [
   { name: "笑影", pos: "support", rating: "A", ovr: 80, retired: true },   // 2026-01 官宣退役（AG/EDG 游走）
   { name: "小A", pos: "support", rating: "B", ovr: 80 , team: "武汉eStarPro" },
   { name: "信", pos: "support", rating: "B", ovr: 80 , team: "重庆狼队" },     // 重庆狼队
-  { name: "玖痕", pos: "support", rating: "B", ovr: 79 },
-  { name: "落空", pos: "support", rating: "B", ovr: 79 },
+  { name: "玖痕", pos: "support", rating: "B", ovr: 79 },   // 2026-01 与上海EDG.M 解约，自由身
+  { name: "落空", pos: "support", rating: "B", ovr: 79 , team: "深圳DYG" },  // DYG 2025-11 转会加盟，2026 主力游走
+  { name: "叶凡", pos: "support", rating: "B", ovr: 77 , team: "深圳DYG" },  // DYG 2025-12 加盟，游走轮换
   { name: "紫渊", pos: "support", rating: "B", ovr: 79 , team: "南通Hero久竞" },
   { name: "koko", pos: "support", rating: "B", ovr: 78 },   // EDG.M，2018 最佳阵容一阵
   { name: "小七", pos: "support", rating: "B", ovr: 78 },
@@ -594,8 +599,8 @@ const REAL_ROSTERS = {
     mid: ["挽墨"], bot: ["小俞", "佩恩"], support: ["梦溪"]
   },
   "深圳DYG": {
-    top: ["栋栋"], jungle: ["小白熊"],
-    mid: ["向鱼"], bot: ["小义", "钎城", "秋源"], support: ["玖痕"]
+    top: ["小乐", "栋栋"], jungle: ["小轩", "方羽"],
+    mid: ["向鱼", "星潼"], bot: ["钎城", "秋源"], support: ["落空", "叶凡"]
   },
   "上海RNG.M": {
     top: ["小困"], jungle: ["航航"],
