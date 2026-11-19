@@ -74,7 +74,7 @@ globalThis.__T = {
   HERO_FORMS, heroInPos, heroFormOf, heroHasForms, heroFormLabel, heroFormList, heroFormForPos, pickEntry, posPower, evaluateComp,
   heroBestLane, beginAssign, autoAssignSide, assignLane, unassigned, finishDraft, draftPick, filledPos,
   myThreatScore, scoutInit, scoutOf, scoutRecord, scoutBias, scoutDecay, myBestResponseRisk, aiBanHero,
-  activePool, ACTIVE_POOL, POOL,
+  activePool, ACTIVE_POOL, POOL, REAL_ROSTERS, TEAMS,
   bpEvalSide, bpSideCands, bpWorstAfterMyPick, predictPlayerPick, bpDenyValue, BP_LEVELS,
   standingsSorted, teamGameStats, rotationSuggest, applyRotation, restTeam,
   oppThreatHeroes, loanCandidates, loanSign, loanBlocker, loanFee, applyLoan, LOAN_GAMES,

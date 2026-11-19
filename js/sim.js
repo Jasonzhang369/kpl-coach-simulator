@@ -1807,7 +1807,7 @@ function buildMarket() {
     const take = list.slice(0, 2);
     take.forEach(e => {
       const p = makePlayerFrom(e);
-      cands.push({ id: uid(), kind: "fa", name: p.name, pos, rating: p.rating, ovr: p.ovr, ceil: p.ceil, price: priceFor(p.ovr), player: p });
+      cands.push({ id: uid(), kind: "fa", name: p.name, pos, rating: p.rating, ovr: p.ovr, ceil: p.ceil, price: priceFor(p.ovr), player: p, team: e.team || "" });
     });
   });
   // 挖角：他队替补

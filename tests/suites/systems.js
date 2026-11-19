@@ -705,6 +705,18 @@ module.exports = function (env, H) {
     ok("JDG 对抗路首发是光明", jdgTop && jdgTop.name === "光明", jdgTop && jdgTop.name);
     const wb = S0.teams.find(t => t.name === "北京WB");
     ok("WB 游走没有阿豆（已退役）", wb && !wb.players.support.some(p => p.name === "阿豆"));
+    // 关键回归：REAL_ROSTERS 的 key 必须和 TEAMS 完全一致，否则该队会静默走兜底
+    const teamNames = T.getS().teams.map(t => t.name);
+    ok("每支战队都有真实名单", teamNames.every(n => !!T.REAL_ROSTERS[n]),
+      teamNames.filter(n => !T.REAL_ROSTERS[n]).join(","));
+    ok("名单没有多余 key", Object.keys(T.REAL_ROSTERS).every(n => teamNames.indexOf(n) >= 0),
+      Object.keys(T.REAL_ROSTERS).filter(n => teamNames.indexOf(n) < 0).join(","));
+    const lgd = S0.teams.find(t => t.name === "杭州LGD.NW");
+    ok("LGD 走的是真实名单（有赤辰/小涵）",
+      lgd && lgd.players.jungle.some(p => p.name === "赤辰") && lgd.players.bot.some(p => p.name === "小涵"));
+    const hero = S0.teams.find(t => t.name === "南京Hero久竞");
+    ok("Hero 走的是真实名单（有清弦/白清）",
+      hero && hero.players.mid.some(p => p.name === "清弦") && hero.players.support.some(p => p.name === "白清"));
 
     // 数据侧：安凉的招牌英雄与几处评分调整
     const al = T.POOL.find(p => p.name === "安凉");

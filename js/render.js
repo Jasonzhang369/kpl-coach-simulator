@@ -662,7 +662,7 @@ function renderMarket() {
     return `<div class="player-card">
       <span class="pos ${c.pos}">${POS_NAME[c.pos]}</span>
       <h4>${escapeHtml(c.name)} <span class="pill" style="font-size:10px;color:${ratingColor(c.rating)};border-color:${ratingColor(c.rating)}">${c.rating}</span></h4>
-      <div class="lv">总评 ${c.ovr} · 上限${c.ceil != null ? c.ceil : ceilFor(c.rating)} · ${c.kind === "poach" ? `来自 ${escapeHtml(c.teamName)}(替补)` : "自由身"}</div>
+      <div class="lv">总评 ${c.ovr} · 上限${c.ceil != null ? c.ceil : ceilFor(c.rating)} · ${c.kind === "poach" ? `来自 ${escapeHtml(c.teamName)}(替补)` : (c.team ? `其他队 · ${escapeHtml(c.team)}` : "自由身")}</div>
       <div class="flex-between mt"><span style="color:var(--gold);font-weight:800">¥${c.price}万</span>
       <button class="btn sm ${can ? '' : 'ghost'}" data-act="marketbuy:${c.id}" aria-label="签约 ${escapeHtml(c.name)}，${POS_NAME[c.pos]}，总评 ${c.ovr}，价格 ${c.price} 万" ${can ? '' : 'disabled'}>签约</button></div>
     </div>`;
