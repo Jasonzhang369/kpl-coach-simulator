@@ -1533,6 +1533,28 @@ function bracketRefresh() {
   });
 }
 function bracketDef(key) { return (S.bracket.def || []).find(m => m.key === key) || null; }
+/* 玩家出局（或没进季后赛）后，把剩下的季后赛交给 AI 打完：
+   否则对阵图会停在「总决赛待定」，赛季总结里也永远没有联盟冠军。 */
+function simulateRemainingPlayoff() {
+  const B = S.bracket;
+  if (!B || !B.def) return 0;
+  let n = 0, guard = 0;
+  while (guard++ < 40) {
+    bracketRefresh();
+    const m = B.def.find(x => !B.resolved[x.key] && B.slots[x.key] && B.slots[x.key].a && B.slots[x.key].b);
+    if (!m) break;
+    const sl = B.slots[m.key];
+    if (sl.a === S.myTeamId || sl.b === S.myTeamId) break;   // 还有我的比赛，不能替玩家打
+    resolveAIKey(m.key);
+    n++;
+  }
+  bracketRefresh();
+  return n;
+}
+function playoffChampionName() {
+  const r = S.bracket && S.bracket.resolved && S.bracket.resolved.gf;
+  return r && r.winner ? teamName(r.winner) : "";
+}
 function resolveAIKey(key) {
   const B = S.bracket, SL = B.slots[key], R = B.resolved;
   if (!SL || !SL.a || !SL.b || R[key]) return;
@@ -1752,7 +1774,7 @@ function recordHistory() {
       matches.push({ tag: "季后赛", round: 0, label: SLOT_LABEL[slot], oppName: teamNameOf(iAmA ? SL.b : SL.a), myScore, opScore, win: myScore > opScore });
     });
   }
-  S.history.push({ season: S.season, team: t.name, rank: r.rank || null, playoff: !!r.playoff || !!r.final || !!r.champion, final: !!r.final, champion: !!S.champion, prestige: Math.round(t.prestige), matches, fixtures });
+  S.history.push({ season: S.season, team: t.name, rank: r.rank || null, playoff: !!r.playoff || !!r.final || !!r.champion, final: !!r.final, champion: !!S.champion, champName: r.champName || (S.champion ? t.name : ""), prestige: Math.round(t.prestige), matches, fixtures });
 }
 function newSeason() {
   const t = getMyTeam(), r = S.seasonResult || {};

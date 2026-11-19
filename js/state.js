@@ -845,7 +845,7 @@ function seriesContinue() {
     advanceRegular();
   } else {
     if (s.playoffSlot === "gf") {
-      S.phase = "end"; S.champion = win; S.seasonResult = { champion: win, final: true };
+      S.phase = "end"; S.champion = win; S.seasonResult = { champion: win, final: true, champName: win ? t.name : teamName(s.oppId) };
       if (win) { addPrestige(15, "总冠军"); t.fans += randInt(30000, 80000); }
       else addPrestige(4, "亚军");
       recordHistory();
@@ -869,8 +869,10 @@ function seriesContinue() {
     }
     const next = playoffMyNext();
     if (next.eliminated) {
-      S.phase = "end"; S.seasonResult = { champion: false, playoff: true }; recordHistory();
-      S.event = { title: "季后赛止步", text: "双败淘汰赛出局。", msg: `${next.label}。来年再战！` };
+      try { simulateRemainingPlayoff(); } catch (e) {}   // 我出局了，剩下的交给 AI 决出冠军
+      const champ = playoffChampionName();
+      S.phase = "end"; S.seasonResult = { champion: false, playoff: true, champName: champ }; recordHistory();
+      S.event = { title: "季后赛止步", text: "双败淘汰赛出局。", msg: `${next.label}。${champ ? `本赛季总冠军：${champ}。` : ""}来年再战！` };
       S.page = "event"; save(); render(); return;
     }
     S.pendingPlayoff = next;
@@ -902,9 +904,13 @@ function advanceRegular() {
   const top10 = sorted.slice(0, 10);          // KPL 官方晋级线：常规赛前 10 进季后赛
   const myRank = top10.findIndex(t => t.id === S.myTeamId);
   if (myRank === -1) {
-    S.phase = "end"; S.seasonResult = { rank: sorted.findIndex(t => t.id === S.myTeamId) + 1, champion: false };
+    // 没进季后赛：联盟的季后赛照常进行，由 AI 打完并决出冠军（否则整个赛季没有冠军归属）
+    setupPlayoff(top10.map(t => t.id));
+    try { simulateRemainingPlayoff(); } catch (e) {}
+    const champ = playoffChampionName();
+    S.phase = "end"; S.seasonResult = { rank: sorted.findIndex(t => t.id === S.myTeamId) + 1, champion: false, champName: champ };
     addPrestige(-8, "无缘季后赛"); recordHistory();
-    S.event = { title: "赛季落幕", text: "常规赛结束。", msg: `很遗憾未能进入前十，最终排名第 ${S.seasonResult.rank}。` };
+    S.event = { title: "赛季落幕", text: "常规赛结束。", msg: `很遗憾未能进入前十，最终排名第 ${S.seasonResult.rank}。${champ ? `本赛季总冠军：${champ}。` : ""}` };
     S.page = "event"; S.tab = "schedule"; save(); render(); return;
   }
   setupPlayoff(top10.map(t => t.id));

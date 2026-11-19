@@ -40,8 +40,13 @@ module.exports = function (env, H) {
     T.POS.forEach(p => {
       const cur = t.players[p].find(x => x.id === t.lineup[p]);
       if (cur) cur.st = 40;
-      const bench = t.players[p].find(x => x.id !== t.lineup[p]);
-      if (bench) { bench.st = 90; bench.status = "ok"; bench.statusRounds = 0; if (cur) bench.ovr = cur.ovr; }
+      // 有的位置开局只有首发（16 队 × 1 人就把池子分光了），此时临时从自由身补一个替补，
+      // 否则 rotationSuggest 对整个位置直接跳过 → 断言偶发为 0
+      let bench = t.players[p].find(x => x.id !== t.lineup[p]);
+      if (!bench) { bench = T.takeFreeAgent(p); if (!t.players[p]) t.players[p] = []; t.players[p].push(bench); }
+      bench.st = 90; bench.status = "ok"; bench.statusRounds = 0;
+      if (cur) bench.ovr = cur.ovr;
+      bench.op = bench.aw = bench.co = bench.me = bench.st = bench.ovr;
     });
     const sug = T.rotationSuggest(t);
     ok("低体能触发轮换建议", sug.length > 0, sug.length);

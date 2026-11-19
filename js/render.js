@@ -558,7 +558,7 @@ function renderHistory() {
       : "";
     return `<details class="season-block"${S.history.length === 1 ? " open" : ""}>
       <summary><b>S${h.season}</b> · ${escapeHtml(h.team)} · <b class="${h.champion ? "c-good" : ""}">${title}</b> · ${wins}胜${loses}负 · 声望 ${Math.round(h.prestige)}</summary>
-      <div class="season-body">${myTable}${league}</div>
+      <div class="season-body">${h.champName && !h.champion ? `<div class="muted mb">本赛季总冠军：<b style="color:var(--gold)">${escapeHtml(h.champName)}</b></div>` : ""}${myTable}${league}</div>
     </details>`;
   }).join("");
   return `<div class="section-title mt">历届赛季总结（可折叠）</div>${blocks}`;

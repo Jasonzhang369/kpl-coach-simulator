@@ -850,5 +850,24 @@ module.exports = function (env, H) {
     (S3.freeAgents.top || []).forEach(e => { if (seen.has(e.name)) faClash++; });
     ok("自愈后全联盟无同名选手", dup === 0, dup);
     ok("自愈后自由身池无队内选手", faClash === 0, faClash);
+
+    // 4) 没进季后赛：联盟季后赛也要打完并决出冠军（否则赛季没有冠军归属）
+    const e3 = H.makeEnv();
+    const T3 = e3.T;
+    T3.newGame({ difficulty: "职业", rosterMode: "draft", teamName: "成都AG超玩会", slot: 1 });
+    const S4 = T3.getS();
+    S4.schedule.forEach(x => { x.played = true; });
+    S4.teams.forEach(tm => {
+      tm.games = 15;
+      if (tm.id === S4.myTeamId) { tm.wins = 0; tm.losses = 15; tm.points = 0; }
+      else { tm.wins = 12; tm.losses = 3; tm.points = 24; }
+    });
+    T3.advanceRegular();
+    const S5 = T3.getS();
+    ok("垫底时判定为未进季后赛", S5.phase === "end" && !!(S5.seasonResult && S5.seasonResult.rank), JSON.stringify(S5.seasonResult));
+    ok("未进季后赛时对阵图已生成", !!(S5.bracket && S5.bracket.def), !!(S5.bracket));
+    ok("未进季后赛时联盟冠军已决出", !!(S5.bracket && S5.bracket.resolved && S5.bracket.resolved.gf),
+      S5.bracket && Object.keys(S5.bracket.resolved || {}).join(","));
+    ok("赛季总结记录了联盟冠军", !!(S5.seasonResult && S5.seasonResult.champName), JSON.stringify(S5.seasonResult && S5.seasonResult.champName));
   });
 };
