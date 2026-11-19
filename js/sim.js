@@ -47,7 +47,12 @@ function makePlayerFrom(e) {
   const age = clamp(e.ovr >= 90 ? randInt(20, 28) : e.ovr >= 84 ? randInt(19, 27) : randInt(17, 25), 17, 30);
   const stCap = stCapForAge(age);
   // 英雄池：6 个，第一个是绝活（熟练度最高），依次递减
-  const heroPool = pickHeroes(e.pos, 6);
+  let heroPool = pickHeroes(e.pos, 6);
+  // 招牌英雄（如安凉的镜/露娜/哪吒）：优先占绝活位，剩下的再随机补
+  if (Array.isArray(e.sig) && e.sig.length) {
+    const sig = e.sig.filter(n => HEROES.some(h => h.name === n));
+    if (sig.length) heroPool = sig.concat(heroPool.filter(n => !sig.includes(n))).slice(0, 6);
+  }
   const mastery = {};
   heroPool.forEach((n, i) => { mastery[n] = clamp(92 - i * 5 + randInt(-4, 4), 45, 96); });
   return {
@@ -113,7 +118,7 @@ function recycleToFreeAgents(p) {
 // 每队拿到「一强一弱」两人，各队战力天然接近（靠分配平衡，绝不修改任何选手的评分/属性）。
 function assignRosters(names) {
   const byPos = {};
-  POS.forEach(pos => { byPos[pos] = shuffle(POOL.filter(p => p.pos === pos).map(p => ({ ...p }))); });
+  POS.forEach(pos => { byPos[pos] = shuffle(activePool().filter(p => p.pos === pos).map(p => ({ ...p }))); });
   const leftover = {};
   POS.forEach(pos => leftover[pos] = []);
   const result = {};
@@ -148,13 +153,13 @@ function assignRosters(names) {
     preLeft.forEach(e => leftover[pos].push(e));
   });
   names.forEach(n => POS.forEach(pos => {
-    while (result[n][pos].length < 2) result[n][pos].push(makePlayerFrom(choice(POOL.filter(p => p.pos === pos))));
+    while (result[n][pos].length < 2) result[n][pos].push(makePlayerFrom(choice(activePool().filter(p => p.pos === pos))));
     result[n][pos].sort((a, b) => b.ovr - a.ovr); // 首发用更强的
   }));
   POS.forEach(pos => shuffle(leftover[pos]));
   return { result, leftover };
 }
-function freeAgentEntry(pos) { return choice(POOL.filter(p => p.pos === pos)); }
+function freeAgentEntry(pos) { return choice(activePool().filter(p => p.pos === pos)); }
 /* ---------------- 难度 = 对手 BP 水平（不改任何战力/属性） ----------------
    新秀：会犯小错——不读对手英雄池、不针对克制、偶尔拿"舒适英雄"；
          但仍然认分路、仍会挑强度高的英雄（不降智，只是不够细）。

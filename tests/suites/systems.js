@@ -681,4 +681,44 @@ module.exports = function (env, H) {
     ok("排位后 5 个英雄分属五条分路", new Set(s.draft.picks[s.draft.mySide].map(e => e.pos)).size === 5,
       s.draft.picks[s.draft.mySide].map(e => e.pos).join("/"));
   });
+
+  /* 退役选手（A 方案）：保留在池里，但不进选秀/自由身/转会市场 */
+  suite("退役选手隔离", () => {
+    const retired = T.POOL.filter(p => p.retired).map(p => p.name);
+    ok("存在退役标记", retired.length >= 10, retired.length);
+    ok("阿豆已退役", retired.indexOf("阿豆") >= 0);
+    ok("花海/久诚已退役", retired.indexOf("花海") >= 0 && retired.indexOf("久诚") >= 0);
+    ok("现役池不含退役者", T.activePool().every(p => !p.retired), T.activePool().length);
+    ok("池子仍保留退役数据", T.POOL.length > T.activePool().length);
+
+    // 真实名单模式：退役者不得出现在任何队或自由身
+    H.newGame(env, { difficulty: "职业", rosterMode: "real" });
+    let leak = [];
+    const S0 = T.getS();
+    S0.teams.forEach(t => T.POS.forEach(pos => t.players[pos].forEach(p => {
+      if (retired.indexOf(p.name) >= 0) leak.push(t.name + ":" + p.name);
+    })));
+    Object.values(S0.freeAgents || {}).flat().forEach(e => { if (retired.indexOf(e.name) >= 0) leak.push("FA:" + e.name); });
+    ok("真实名单与自由身都没有退役者", leak.length === 0, leak.join(","));
+    const jdg = S0.teams.find(t => t.name === "北京JDG");
+    const jdgTop = jdg && jdg.players.top.find(p => p.id === jdg.lineup.top);
+    ok("JDG 对抗路首发是光明", jdgTop && jdgTop.name === "光明", jdgTop && jdgTop.name);
+    const wb = S0.teams.find(t => t.name === "北京WB");
+    ok("WB 游走没有阿豆（已退役）", wb && !wb.players.support.some(p => p.name === "阿豆"));
+
+    // 数据侧：安凉的招牌英雄与几处评分调整
+    const al = T.POOL.find(p => p.name === "安凉");
+    ok("安凉总评 82 / 野核招牌", al.ovr === 82 && (al.sig || []).length === 3, `${al.ovr} ${(al.sig || []).join("/")}`);
+    ok("一笙 89（S）", T.POOL.find(p => p.name === "一笙").ovr === 89 && T.POOL.find(p => p.name === "一笙").rating === "S");
+    ok("梦溪 78 / Ming 76", T.POOL.find(p => p.name === "梦溪").ovr === 78 && T.POOL.find(p => p.name === "Ming").ovr === 76);
+    ok("光明 85", T.POOL.find(p => p.name === "光明").ovr === 85);
+
+    // 开档后安凉的英雄池必须带招牌
+    H.newGame(env, { difficulty: "职业", rosterMode: "real" });
+    const S1 = T.getS();
+    const pl = S1.teams.flatMap(t => t.players.jungle).find(p => p.name === "安凉");
+    ok("安凉英雄池含镜/露娜/哪吒", pl && ["镜", "露娜", "哪吒"].every(n => pl.heroPool.indexOf(n) >= 0),
+      pl ? pl.heroPool.join("、") : "（未入队）");
+    ok("镜是他的绝活", pl && pl.heroPool[0] === "镜", pl ? pl.heroPool[0] : "-");
+  });
 };
