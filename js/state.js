@@ -143,7 +143,7 @@ function openGuide(force) {
     ["5", "比赛", "常规赛 BO5、季后赛 BO7。赛前先看战力对比，局内事件会真正改变结果；点「跳过战斗」只是快进，不会改变概率。"],
     ["6", "季后赛", "常规赛<b>前 10</b> 进双败淘汰赛（前 4 进胜者组，5~10 从败者组打起、输一场即淘汰）。胜者组输一场会掉进败者组，总决赛一场定胜负。"],
     ["7", "长期", "每 3 个赛季 = 1 岁。27 岁起逐季衰退（主要掉操作与体能上限），记得提前培养接班人；合同到期会自动续约或离队。"],
-    ["8", "目标", "每赛季董事会有 KPI（进季后赛 / 夺冠 / 培养新人），达成给预算和声望，未达成扣。声望归零直接赛季失败。"]
+    ["8", "目标与通关", "每赛季董事会有 KPI（进季后赛 / 夺冠 / 培养新人），达成给预算和声望，未达成扣；<b>声望归零直接 Game Over</b>。另有 5 项<b>教练成就</b>（首冠 / 豪门 / 三连季后赛 / 传奇教练 / 五冠王朝），在【声望】页查看。<b>累计 5 冠 + 声望 100</b> 即通关，通关后可「继续执教」进入无限赛季。"]
   ];
   const tips = [
     ["一键 BP", "所有难度都能用（含传奇 / 真实大名单）。它会按「这张牌给我阵容涨多少、被对手拿到会不会更赚」来挑，缺前排/缺输出时会补位，也会顺手卡对手。强度：<b>明显强于新秀</b>、<b>和职业五五开</b>、<b>对传奇约四六开（下风）</b>——想稳赢传奇还是得自己 ban/选。"],
@@ -492,6 +492,22 @@ function handleAct(act) {
   if (cmd === "renew") { renewContract(args[0]); return; }
   if (cmd === "confirmnew") { confirmNewGame(); return; }
   if (cmd === "cancelnew") { S.page = "title"; render(); return; }
+  if (cmd === "victorycontinue") {
+    // 通关后选择继续执教：标记已看过通关，回到无限赛季模式，之后不再重复弹出
+    if (!S) return;
+    S.victory = null; S.victoryDismissed = true;
+    S.page = "main"; S.tab = "schedule";
+    toast("继续执教：可继续挑战无限赛季，通关画面不再重复弹出");
+    save(); render(); return;
+  }
+  if (cmd === "victoryrestart") {
+    const slot = (S && S.slot) || 1;
+    return confirmDialog({ title: "清空存档重新开档？", body: `存档 ${slot} 的王朝进度将被清空，无法恢复。`, okText: "清空重开", danger: true }).then(ok => {
+      if (!ok) return;
+      try { localStorage.removeItem(slotKey(slot)); } catch (e) {}
+      S = null; render();
+    });
+  }
   if (cmd === "restartgame") {
     const slot = (S && S.slot) || 1;
     return confirmDialog({ title: "删除本存档并重开？", body: `存档 ${slot} 的进度将被清空。`, okText: "清空重开", danger: true }).then(ok => {
@@ -844,6 +860,19 @@ function seriesContinue() {
     simRoundAIFixtures(S.round);
     advanceRegular();
   } else {
+    // 记录本场季后赛比分与每局阵容（含总决赛——以前 gf 分支提前 return，导致对阵图上总决赛永远"待定"）
+    const SL = S.bracket.slots[s.playoffSlot] || {};
+    const iAmA = SL.a === S.myTeamId;
+    S.bracket.resolved[s.playoffSlot] = {
+      winner: win ? S.myTeamId : s.oppId, loser: win ? s.oppId : S.myTeamId,
+      sa: iAmA ? s.myScore : s.opScore, sb: iAmA ? s.opScore : s.myScore,
+      games: (s.games || []).map(g => ({
+        aWin: iAmA ? g.winner === "me" : g.winner === "opp",
+        luA: iAmA ? POS.map(p => g.myPicks[p]) : POS.map(p => g.oppPicks[p]),
+        luB: iAmA ? POS.map(p => g.oppPicks[p]) : POS.map(p => g.myPicks[p]),
+        peak: !!g.peak
+      }))
+    };
     if (s.playoffSlot === "gf") {
       S.phase = "end"; S.champion = win; S.seasonResult = { champion: win, final: true, champName: win ? t.name : teamName(s.oppId) };
       if (win) { addPrestige(15, "总冠军"); t.fans += randInt(30000, 80000); }
@@ -851,21 +880,6 @@ function seriesContinue() {
       recordHistory();
       S.event = { title: win ? "🏆 总冠军！" : "亚军", text: win ? "你带领战队捧起冠军奖杯！" : "总决赛惜败。", msg: win ? `恭喜！${t.name} 夺得 KPL 总冠军！` : "距离巅峰只差一步，明年卷土重来！" };
       S.page = "event"; save(); render(); return;
-    }
-    {
-      // 记录本场季后赛比分与每局阵容（供 bracket 与赛季总结展示，与常规赛一致）
-      const SL = S.bracket.slots[s.playoffSlot] || {};
-      const iAmA = SL.a === S.myTeamId;
-      S.bracket.resolved[s.playoffSlot] = {
-        winner: win ? S.myTeamId : s.oppId, loser: win ? s.oppId : S.myTeamId,
-        sa: iAmA ? s.myScore : s.opScore, sb: iAmA ? s.opScore : s.myScore,
-        games: (s.games || []).map(g => ({
-          aWin: iAmA ? g.winner === "me" : g.winner === "opp",
-          luA: iAmA ? POS.map(p => g.myPicks[p]) : POS.map(p => g.oppPicks[p]),
-          luB: iAmA ? POS.map(p => g.oppPicks[p]) : POS.map(p => g.myPicks[p]),
-          peak: !!g.peak
-        }))
-      };
     }
     const next = playoffMyNext();
     if (next.eliminated) {
@@ -1148,6 +1162,9 @@ function load(n) {
     if (S.maxFanMeets == null) S.maxFanMeets = 2;
     delete S.autoBpUsed;
     if (S.gameOver === undefined) S.gameOver = null;
+    if (!S.achievements) S.achievements = {};
+    if (S.victory === undefined) S.victory = null;
+    if (S.victoryDismissed === undefined) S.victoryDismissed = false;
     if (!S.fixtures) S.fixtures = buildSchedule(S.myTeamId, S.teams).fixtures;
     if (S.transferWindow == null) S.transferWindow = !(S.round > 1 || (S.schedule || []).some(s => s.played));
     if (!S.aiTransfers) S.aiTransfers = [];

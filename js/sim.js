@@ -316,6 +316,7 @@ function newGame(opts) {
     staff: { mental: 0, fitness: 0, analyst: 0 },
     kpi: null, kpiResult: null,
     fanMeets: 0, maxFanMeets: 2, gameOver: null,
+    achievements: {}, victory: null, victoryDismissed: false,
     champion: false, seasonResult: null, history: [],
     contractNotices: [], undo: null, savedAt: Date.now()
   };
@@ -1414,6 +1415,7 @@ function addPrestige(delta, reason) {
   }
   // 声望归零 → 战队失去公信力，游戏失败
   if (t.prestige <= 0) triggerGameOver(reason);
+  else { try { checkAchievements(); } catch (e) {} }   // 声望类成就即时解锁（首冠/季后赛类在赛季末结算）
 }
 function triggerGameOver(reason) {
   if (!S || S.gameOver) return;
@@ -1775,6 +1777,60 @@ function recordHistory() {
     });
   }
   S.history.push({ season: S.season, team: t.name, rank: r.rank || null, playoff: !!r.playoff || !!r.final || !!r.champion, final: !!r.final, champion: !!S.champion, champName: r.champName || (S.champion ? t.name : ""), prestige: Math.round(t.prestige), matches, fixtures });
+  try { checkAchievements(); } catch (e) {}
+  try { checkVictory(); } catch (e) {}
+}
+
+/* ---------------- 教练成就 / 王朝通关 ----------------
+   成就：赛季中声望达标即时解锁，首冠/连续季后赛等在赛季末记录历史后结算。
+   通关：累计 5 座总冠军 + 声望 100（同时满足），赛季结束时触发。
+        玩家可选择「继续执教」进入无限赛季，此后不再重复弹通关。 */
+const VICTORY_CROWNS = 5;
+const VICTORY_PRESTIGE = 100;
+const ACHIEVEMENTS = [
+  { id: "firstTitle", icon: "🏆", title: "首冠", desc: "拿到第一座 KPL 总冠军" },
+  { id: "powerhouse", icon: "⭐", title: "豪门", desc: "声望达到 60" },
+  { id: "threePlayoffs", icon: "🎫", title: "三连季后赛", desc: "连续 3 个赛季进入季后赛" },
+  { id: "legend", icon: "👑", title: "传奇教练", desc: "声望达到 80" },
+  { id: "fiveCrowns", icon: "🏅", title: "五冠王朝", desc: "累计 5 座总冠军" }
+];
+function championCount() { return (S.history || []).filter(h => h.champion).length; }
+function consecutivePlayoffs() {
+  const h = S.history || [];
+  let n = 0;
+  for (let i = h.length - 1; i >= 0; i--) { if (h[i].playoff) n++; else break; }
+  return n;
+}
+function checkAchievements() {
+  if (!S || S.gameOver) return [];
+  if (!S.achievements) S.achievements = {};
+  const prestige = ((getMyTeam() || {}).prestige) || 0;
+  const crowns = championCount(), cons = consecutivePlayoffs();
+  const cond = {
+    firstTitle: crowns >= 1,
+    powerhouse: prestige >= 60,
+    threePlayoffs: cons >= 3,
+    legend: prestige >= 80,
+    fiveCrowns: crowns >= VICTORY_CROWNS
+  };
+  const got = [];
+  ACHIEVEMENTS.forEach(a => {
+    if (S.achievements[a.id] || !cond[a.id]) return;
+    S.achievements[a.id] = { season: S.season, at: Date.now() };
+    got.push(a);
+    S.log.unshift(`🏅 成就解锁「${a.title}」：${a.desc}`);
+  });
+  if (got.length) { try { toast("🏅 解锁成就：" + got.map(a => a.icon + a.title).join("、")); } catch (e) {} }
+  return got;
+}
+function checkVictory() {
+  if (!S || S.gameOver || S.victory || S.victoryDismissed) return false;
+  const t = getMyTeam();
+  if (!t || championCount() < VICTORY_CROWNS || t.prestige < VICTORY_PRESTIGE) return false;
+  S.victory = { season: S.season, team: t.name, crowns: championCount(), prestige: Math.round(t.prestige), at: Date.now() };
+  S.log.unshift(`👑 王朝达成：累计 ${championCount()} 冠 · 声望 ${Math.round(t.prestige)}，通关！`);
+  try { save(); } catch (e) {}
+  return true;
 }
 function newSeason() {
   const t = getMyTeam(), r = S.seasonResult || {};

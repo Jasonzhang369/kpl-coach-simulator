@@ -70,6 +70,7 @@ globalThis.__T = {
   battleTick, finishBattle, simGame, commitGame, seriesContinue, newSeason, advanceRegular,
   myAutoPick, myAutoBan, myPeakAutoPick, aiBanHero, aiPickTurn, aiBpLevel, aiBpCfg,
   repairRosters, takeFreeAgent, recycleToFreeAgents, marketBuy, marketSell, loanFee,
+  VICTORY_CROWNS, VICTORY_PRESTIGE, ACHIEVEMENTS, championCount, consecutivePlayoffs, checkAchievements, checkVictory,
   getMyTeam, teamPower, heroByName, heroStrength, laneFit, fitLabel, matchupMult,
   HEROES, HERO_TRAITS, heroTraitMult, heroTraitNote, ANTI_CC_THRESHOLD, pickHeroes,
   HERO_FORMS, heroInPos, heroFormOf, heroHasForms, heroFormLabel, heroFormList, heroFormForPos, pickEntry, posPower, evaluateComp,

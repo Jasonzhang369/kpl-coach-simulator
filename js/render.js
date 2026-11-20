@@ -31,8 +31,11 @@ function restoreView(sc) {
 }
 function render() {
   const sc = captureView();
+  // 通关一旦达成就锁定页面，直到玩家选择「继续执教」或「重新开档」
+  if (S && S.victory && !S.victoryDismissed && S.page !== "victory") S.page = "victory";
   if (!S) { renderTitle(); }
   else if (S.gameOver) { root.innerHTML = renderGameOver(); }
+  else if (S.page === "victory") { root.innerHTML = renderVictory(); }
   else if (S.page === "title") { renderTitle(); }
   else if (S.page === "series") { renderSeries(); }
   else if (S.page === "event") { renderEvent(); }
@@ -67,7 +70,7 @@ function undoLast() {
 function clearUndo() { if (S) S.undo = null; render(); }
 function renderUndoBar() {
   let el = document.getElementById("undo-bar");
-  if (!S || !S.undo || S.page === "series" || S.gameOver) { if (el) el.remove(); return; }
+  if (!S || !S.undo || S.page === "series" || S.page === "victory" || S.gameOver) { if (el) el.remove(); return; }
   if (!el) {
     el = document.createElement("div");
     el.id = "undo-bar"; el.className = "undo-bar";
@@ -757,12 +760,19 @@ function renderPrestige() {
   <div class="section-title mt">声望效果</div>
   <ul class="muted" style="line-height:1.9;padding-left:18px">${eff.map(e => `<li>${e}</li>`).join("")}</ul>
   <div class="muted mt">获取：比赛/系列赛胜利、晋级/夺冠、正面事件、媒体赞誉；失利与卖主力会降低。</div>
+  <div class="section-title mt">教练成就（${ACHIEVEMENTS.filter(a => S.achievements && S.achievements[a.id]).length} / ${ACHIEVEMENTS.length}）</div>
+  ${ACHIEVEMENTS.map(a => {
+    const e = S.achievements && S.achievements[a.id];
+    const when = e ? `（S${e.season} 达成）` : "未达成";
+    return `<div class="report-line"><span class="tag ${e ? "win" : "even"}">${a.icon}</span><span class="body"><b>${a.title}</b> · ${a.desc} <span class="muted">${when}</span></span></div>`;
+  }).join("")}
+  <div class="muted mt" style="font-size:12px">通关条件：累计 ${VICTORY_CROWNS} 座总冠军 + 声望 ${VICTORY_PRESTIGE}（当前 ${championCount()} 冠）。达成后可继续执教。</div>
   <div class="section-title mt">近期动态</div>${logs || '<div class="muted">暂无记录</div>'}`;
 }
 /* ---------------- 赛制表 ---------------- */
 function renderFormat() {
   return `<div class="section-title">KPL 赛制表（S${S.season}）</div>
-  <div class="report-line"><span class="tag key">联盟</span><span class="body">共 12 支战队，与其余 11 支进行一个赛季较量。</span></div>
+  <div class="report-line"><span class="tag key">联盟</span><span class="body">共 16 支战队，与其余 15 支进行一个赛季较量。</span></div>
   <div class="report-line"><span class="tag win">常规赛</span><span class="body">单循环，每队 <b>15 场</b>，每场为 <b>BO5 系列赛</b>（先拿 3 分）。系列赛中<b>每一局都要 BP</b>，采用<b>全局 BP</b>：任意一方选过的英雄，后续局双方都不能再用。胜一场积 2 分，取<b>前 10 名</b>晋级季后赛（前 4 进胜者组，5~10 从败者组打起）。</span></div>
   <div class="report-line"><span class="tag key">季后赛</span><span class="body"><b>常规赛前 10 名晋级，双败淘汰（BO7）</b>。前 4 名进<b>胜者组</b>（半决赛 1v4、2v3），5~10 名从<b>败者组</b>打起（7v10、8v9，输一场即淘汰）；胜者组落败的队掉进败者组，与败者组胜者逐轮对撞，最终胜者组冠军与败者组冠军打<b>总决赛</b>，胜者夺冠。</span></div>
   <div class="report-line"><span class="tag key">巅峰对决</span><span class="body">BO7 打到 <b>3:3</b> 时，第 7 局为<b>巅峰对决</b>：<b>没有 ban 位</b>、双方<b>盲选</b>、<b>不受全局BP限制</b>（此前用过的英雄仍可选），双方甚至可能<b>选到同一个英雄</b>。选满 5 人后立即揭示对手阵容并开赛。</span></div>
@@ -1624,3 +1634,30 @@ function showEventModal() {
   mask.addEventListener("click", (e) => { const b = e.target.closest("[data-act]"); if (b) handleAct(b.getAttribute("data-act")); });
 }
 function renderEvent() { renderMain(); }
+/* 王朝通关画面：累计 5 冠 + 声望 100 同时满足 */
+function renderVictory() {
+  const v = S.victory || {};
+  const t = getMyTeam();
+  const got = ACHIEVEMENTS.filter(a => S.achievements && S.achievements[a.id]);
+  const hist = S.history || [];
+  const matches = hist.reduce((all, h) => all.concat(h.matches || []), []);
+  const w = matches.filter(m => m.win).length;
+  return `<div class="card">
+    <div class="center" style="font-size:40px;font-weight:900;color:var(--gold);letter-spacing:4px">👑 王朝达成 👑</div>
+    <div class="center" style="font-size:15px;margin:10px 0 4px">${escapeHtml(v.team || (t && t.name) || "你的战队")} 累计拿下 <b style="color:var(--gold)">${v.crowns || championCount()} 座总冠军</b>，声望达到 <b style="color:var(--gold)">${v.prestige || Math.round((t && t.prestige) || 0)}</b>。</div>
+    <div class="center muted">你是 KPL 历史上的传奇主教练 —— 通关达成。</div>
+    <div class="section-title mt">执教生涯</div>
+    <div class="report-line"><span class="tag key">赛季</span><span class="body">${hist.length} 个赛季 · S${v.season || S.season}</span></div>
+    <div class="report-line"><span class="tag key">战绩</span><span class="body">${w} 胜 ${matches.length - w} 负（含季后赛）</span></div>
+    <div class="report-line"><span class="tag key">资产</span><span class="body">资金 ¥${t ? Math.round(t.money) : 0}万 · 粉丝 ${t ? Math.round(t.fans).toLocaleString() : 0}</span></div>
+    <div class="section-title mt">教练成就（${got.length} / ${ACHIEVEMENTS.length}）</div>
+    ${ACHIEVEMENTS.map(a => {
+      const e = S.achievements && S.achievements[a.id];
+      const when = e ? `（S${e.season} 达成）` : "未达成";
+    return `<div class="report-line"><span class="tag ${e ? "win" : "even"}">${a.icon}</span><span class="body"><b>${a.title}</b> · ${a.desc} <span class="muted">${when}</span></span></div>`;
+    }).join("")}
+    <div class="warn mt">通关后你可以继续执教（无限赛季，之后不再弹出通关画面），也可以清空存档重新开档。</div>
+    <button class="btn gold mt" data-act="victorycontinue" style="width:100%">继续执教（无限赛季）</button>
+    <button class="btn ghost mt" data-act="victoryrestart" style="width:100%">重新开档</button>
+  </div>`;
+}

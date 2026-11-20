@@ -807,7 +807,16 @@ module.exports = function (env, H) {
     const S0 = T2.getS();
 
     // 1) 买自由身选手：必须从自由身池里删掉，否则下赛季 AI 会抽到同一个人（两队同名）
-    const cand = (S0.market || []).find(c => c.kind === "fa" && t.players[c.pos].length < 4 && t.money >= c.price);
+    let cand = (S0.market || []).find(c => c.kind === "fa" && t.players[c.pos].length < 4 && t.money >= c.price);
+    if (!cand) {
+      // 市场是随机刷新的：没刷出可买的自由身时，手工造一个，保证这条回归不受随机性影响
+      const pos = "top";
+      const pl = T2.takeFreeAgent(pos);
+      if (!S0.freeAgents[pos]) S0.freeAgents[pos] = [];
+      S0.freeAgents[pos].push({ name: pl.name, pos, rating: pl.rating, ovr: pl.ovr });
+      cand = { id: "test-fa", kind: "fa", name: pl.name, pos, price: 0, player: pl };
+      S0.market.push(cand);
+    }
     ok("市场里有可买的自由身", !!cand);
     if (cand) {
       ok("买前自由身池里有他", (S0.freeAgents[cand.pos] || []).some(e => e.name === cand.name));
@@ -869,5 +878,84 @@ module.exports = function (env, H) {
     ok("未进季后赛时联盟冠军已决出", !!(S5.bracket && S5.bracket.resolved && S5.bracket.resolved.gf),
       S5.bracket && Object.keys(S5.bracket.resolved || {}).join(","));
     ok("赛季总结记录了联盟冠军", !!(S5.seasonResult && S5.seasonResult.champName), JSON.stringify(S5.seasonResult && S5.seasonResult.champName));
+  });
+
+  suite("教练成就 · 王朝通关 · 继续执教", () => {
+    const e = H.makeEnv();
+    const T = e.T;
+    T.setConfirm(() => ({ then: f => f(true) }));
+    T.newGame({ difficulty: "职业", rosterMode: "draft", teamName: "成都AG超玩会", slot: 1 });
+    const S = T.getS();
+    const name = "成都AG超玩会";
+    const h = (season, champion) => ({ season, team: name, rank: 1, playoff: true, final: champion, champion, prestige: 100, champName: champion ? name : "", matches: [], fixtures: [] });
+
+    ok("通关线是 5 冠 + 声望 100", T.VICTORY_CROWNS === 5 && T.VICTORY_PRESTIGE === 100);
+    ok("开局没有成就", Object.keys(S.achievements || {}).length === 0);
+
+    // 首冠
+    S.history.push(h(1, true));
+    S.season = 2;
+    T.checkAchievements();
+    ok("首冠成就解锁", !!S.achievements.firstTitle);
+    // 豪门（声望 60）
+    T.getMyTeam().prestige = 62;
+    T.checkAchievements();
+    ok("豪门成就解锁", !!S.achievements.powerhouse);
+    // 三连季后赛
+    S.history.push(h(2, true)); S.history.push(h(3, true));
+    T.checkAchievements();
+    ok("三连季后赛成就解锁", !!S.achievements.threePlayoffs);
+    ok("成就不会重复解锁", T.checkAchievements().length === 0);
+
+    // 通关条件必须同时满足
+    T.getMyTeam().prestige = 99;
+    ok("3 冠 + 声望 99 不通关", T.championCount() === 3 && !T.checkVictory());
+    T.getMyTeam().prestige = 100;
+    ok("3 冠 + 声望 100 不通关", !T.checkVictory());
+    S.history.push(h(4, true));
+    T.getMyTeam().prestige = 90;
+    ok("4 冠 + 声望 90 不通关", T.championCount() === 4 && !T.checkVictory());
+    S.history.push(h(5, true));
+    S.season = 5;
+    T.getMyTeam().prestige = 100;
+    T.checkAchievements();
+    ok("五冠成就解锁", !!S.achievements.fiveCrowns);
+    ok("5 冠 + 声望 100 通关", T.checkVictory() === true);
+    ok("通关记录保存完整", !!S.victory && S.victory.crowns === 5 && S.victory.prestige === 100, JSON.stringify(S.victory));
+    T.render();
+    ok("渲染出王朝达成页", e.root().indexOf("王朝达成") >= 0);
+    ok("通关页有计划继续执教按钮", e.root().indexOf("victorycontinue") >= 0);
+    ok("通关页显示成就清单", e.root().indexOf("教练成就（5 / 5）") >= 0);
+
+    // 继续执教
+    T.handleAct("victorycontinue");
+    ok("继续执教回到主界面", S.page === "main" && !S.victory);
+    ok("继续执教标记已看过通关", S.victoryDismissed === true && !T.checkVictory());
+    T.render();
+    ok("继续执教后不再显示通关页", e.root().indexOf("王朝达成") < 0);
+    T.newSeason();
+    ok("继续执教后可以开启新赛季", S.season === 6 && S.phase === "regular", `${S.season} ${S.phase}`);
+
+    // 成就页展示
+    S.tab = "prestige"; T.render();
+    ok("声望页显示成就进度", e.root().indexOf("教练成就（5 / 5）") >= 0);
+  });
+  suite("总决赛结算写入对阵图", () => {
+    const e = H.makeEnv();
+    const T = e.T;
+    T.newGame({ difficulty: "职业", rosterMode: "draft", teamName: "成都AG超玩会", slot: 1 });
+    const S = T.getS();
+    const me = S.myTeamId;
+    const opp = S.teams.find(x => x.id !== me).id;
+    T.setupPlayoff(T.standingsSorted().slice(0, 10).map(x => x.id));
+    S.bracket.slots.gf = { a: me, b: opp };
+    T.startSeries(opp, 7, "playoff", "gf", "总决赛");
+    const s = S.series;
+    s.myScore = 4; s.opScore = 2; s.sub = "over";
+    s.games = [{ mySide: "blue", winner: "me", myPicks: { top: "铠", jungle: "澜", mid: "西施", bot: "后羿", support: "张飞" }, oppPicks: { top: "关羽", jungle: "镜", mid: "不知火舞", bot: "公孙离", support: "盾山" } }];
+    T.handleAct("seriescontinue");
+    ok("总决赛结果写入 bracket.resolved.gf", !!S.bracket.resolved.gf, JSON.stringify(S.bracket.resolved.gf));
+    ok("总决赛胜者是我", S.bracket.resolved.gf && S.bracket.resolved.gf.winner === me);
+    ok("夺冠标记正确", S.champion === true && S.phase === "end");
   });
 };

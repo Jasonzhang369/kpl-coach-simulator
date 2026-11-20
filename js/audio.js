@@ -275,6 +275,7 @@ function sfx(name) {
 function bgmTrackFor() {
   if (typeof S === "undefined" || !S) return "menu";
   if (S.gameOver) return "menu";
+  if (S.page === "victory") return "win";
   if (S.page === "title") return "menu";
   const s = S.series;
   if (s) {
