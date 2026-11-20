@@ -879,7 +879,7 @@ function seriesContinue() {
       else addPrestige(4, "亚军");
       recordHistory();
       S.event = { title: win ? "🏆 总冠军！" : "亚军", text: win ? "你带领战队捧起冠军奖杯！" : "总决赛惜败。", msg: win ? `恭喜！${t.name} 夺得 KPL 总冠军！` : "距离巅峰只差一步，明年卷土重来！" };
-      S.page = "event"; save(); render(); return;
+      S.page = S.victory ? "victory" : "event"; save(); render(); return;
     }
     const next = playoffMyNext();
     if (next.eliminated) {
@@ -887,7 +887,7 @@ function seriesContinue() {
       const champ = playoffChampionName();
       S.phase = "end"; S.seasonResult = { champion: false, playoff: true, champName: champ }; recordHistory();
       S.event = { title: "季后赛止步", text: "双败淘汰赛出局。", msg: `${next.label}。${champ ? `本赛季总冠军：${champ}。` : ""}来年再战！` };
-      S.page = "event"; save(); render(); return;
+      S.page = S.victory ? "victory" : "event"; save(); render(); return;
     }
     S.pendingPlayoff = next;
     S.event = { title: "晋级下一轮", text: "双败淘汰赛推进。", msg: `下一场：${next.label} vs ${teamName(next.oppId)}（BO7）。可在赛程页进入，期间可训练/换人/转会。` };
@@ -925,7 +925,7 @@ function advanceRegular() {
     S.phase = "end"; S.seasonResult = { rank: sorted.findIndex(t => t.id === S.myTeamId) + 1, champion: false, champName: champ };
     addPrestige(-8, "无缘季后赛"); recordHistory();
     S.event = { title: "赛季落幕", text: "常规赛结束。", msg: `很遗憾未能进入前十，最终排名第 ${S.seasonResult.rank}。${champ ? `本赛季总冠军：${champ}。` : ""}` };
-    S.page = "event"; S.tab = "schedule"; save(); render(); return;
+    S.page = S.victory ? "victory" : "event"; S.tab = "schedule"; save(); render(); return;
   }
   setupPlayoff(top10.map(t => t.id));
   const next = playoffMyNext();

@@ -1828,6 +1828,7 @@ function checkVictory() {
   const t = getMyTeam();
   if (!t || championCount() < VICTORY_CROWNS || t.prestige < VICTORY_PRESTIGE) return false;
   S.victory = { season: S.season, team: t.name, crowns: championCount(), prestige: Math.round(t.prestige), at: Date.now() };
+  S.page = "victory";   // 落盘时也停在通关页，读档后不会短暂闪回主界面
   S.log.unshift(`👑 王朝达成：累计 ${championCount()} 冠 · 声望 ${Math.round(t.prestige)}，通关！`);
   try { save(); } catch (e) {}
   return true;
